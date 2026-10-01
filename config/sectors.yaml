@@ -1,0 +1,30 @@
+# Sectors excluded from the operating-company screen. EBITDA, net debt, FCF conversion and
+# working-capital days are not meaningful for lenders and insurers; they need a separate
+# framework (NIM, GNPA/NNPA, CRAR, credit cost, combined ratio).
+excluded_from_screen:
+  - Financial Services
+excluded_industries_keywords: [Bank, NBFC, Finance, Insurance, Housing Finance, Capital Markets]
+
+# NSE "Industry" labels (as in index constituent files) mapped to broader sectors.
+industry_to_sector:
+  Automobile and Auto Components: Consumer Discretionary
+  Capital Goods: Industrials
+  Chemicals: Materials
+  Construction: Industrials
+  Construction Materials: Materials
+  Consumer Durables: Consumer Discretionary
+  Consumer Services: Consumer Discretionary
+  Diversified: Industrials
+  Fast Moving Consumer Goods: Consumer Staples
+  Financial Services: Financial Services
+  Forest Materials: Materials
+  Healthcare: Healthcare
+  Information Technology: Information Technology
+  Media Entertainment & Publication: Communication Services
+  Metals & Mining: Materials
+  Oil Gas & Consumable Fuels: Energy
+  Power: Utilities
+  Realty: Real Estate
+  Services: Industrials
+  Telecommunication: Communication Services
+  Textiles: Consumer Discretionary

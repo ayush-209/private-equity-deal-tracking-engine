@@ -1,0 +1,15 @@
+streamlit>=1.50
+pandas>=2.2
+numpy>=1.26
+plotly>=5.22
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9
+PyYAML>=6.0
+python-dotenv>=1.0
+requests>=2.31
+yfinance>=0.2.50
+anthropic>=0.40
+fpdf2>=2.7
+pypdf>=4.0
+openpyxl>=3.1
+pytest>=8.0

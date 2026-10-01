@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: pe
+      POSTGRES_PASSWORD: pe
+      POSTGRES_DB: pe_deals
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pe -d pe_deals"]
+      interval: 5s
+      retries: 10
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
+    ports: ["8501:8501"]
+    depends_on:
+      db: {condition: service_healthy}
+  pipeline:            # docker compose run --rm pipeline demo   |   ... all --source yfinance
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
+    entrypoint: ["python", "-m", "scripts.run_pipeline"]
+    depends_on:
+      db: {condition: service_healthy}
+    profiles: ["jobs"]
+volumes:
+  pgdata:

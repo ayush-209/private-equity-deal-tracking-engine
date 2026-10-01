@@ -1,0 +1,4 @@
+ticker,fiscal_year,period_end,field,value,unit,filing_date
+EXAMPLE,2025,2025-03-31,revenue,255324,cr,2025-04-10
+EXAMPLE,2025,2025-03-31,ebitda,68000,cr,2025-04-10
+EXAMPLE,2025,2025-03-31,eps,134.19,cr,2025-04-10

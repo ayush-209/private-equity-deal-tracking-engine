@@ -1,0 +1,93 @@
+# PE screening configuration. Every threshold used by the engine lives here,
+# so methodology changes are reviewable in git rather than buried in code.
+
+weights:            # default dimension weights; UI sliders start here and are re-normalised to 100
+  growth: 20
+  profitability: 20
+  cash_flow: 20
+  leverage: 15
+  valuation: 15
+  working_capital: 10
+
+peer_groups:
+  min_peers: 5      # below this, the peer group widens industry -> sector -> universe
+
+pass_rules:
+  min_total_score: 60
+  allowed_data_quality: [High, Medium]
+  max_critical_flags: 0
+
+# Sub-metrics per dimension. direction: higher = higher is better, lower = lower is better.
+# Each sub-metric is converted to a percentile rank inside the company's peer group.
+dimensions:
+  growth:
+    - {metric: revenue_cagr_3y, direction: higher}
+    - {metric: revenue_cagr_5y, direction: higher}
+    - {metric: ebitda_cagr_3y, direction: higher}
+    - {metric: eps_cagr_3y, direction: higher}
+    - {metric: revenue_growth_volatility, direction: lower}
+  profitability:
+    - {metric: ebitda_margin, direction: higher}
+    - {metric: ebit_margin, direction: higher}
+    - {metric: roic, direction: higher}
+    - {metric: roe, direction: higher}
+    - {metric: ebitda_margin_change_3y, direction: higher}
+    - {metric: ebitda_margin_volatility, direction: lower}
+  cash_flow:
+    - {metric: fcf_margin, direction: higher}
+    - {metric: fcf_conversion, direction: higher}
+    - {metric: ocf_to_ebitda_3y, direction: higher}
+    - {metric: positive_fcf_years_5y, direction: higher}
+  leverage:
+    - {metric: net_debt_to_ebitda, direction: lower}
+    - {metric: interest_coverage, direction: higher}
+    - {metric: debt_to_equity, direction: lower}
+    - {metric: fcf_to_debt, direction: higher}
+  valuation:
+    - {metric: ev_ebitda, direction: lower}
+    - {metric: ev_sales, direction: lower}
+    - {metric: pe, direction: lower}
+    - {metric: fcf_yield, direction: higher}
+  working_capital:
+    - {metric: cash_conversion_cycle, direction: lower}
+    - {metric: ccc_change_3y, direction: lower}
+    - {metric: dso_change_3y, direction: lower}
+
+min_submetric_coverage: 0.5   # a dimension needs >= 50% of its sub-metrics, else it is marked insufficient
+
+leverage_classes:             # net debt / EBITDA
+  low: 1.0
+  moderate: 2.5
+  high: 4.0                   # above this -> distressed; also distressed if ICR < 1.5 or EBITDA <= 0 with net debt
+
+archetypes:
+  compounder: {revenue_cagr_3y: 0.12, roic: 0.15, fcf_conversion: 0.50}
+  cash_flow_compounder: {revenue_cagr_3y: 0.08, fcf_conversion: 0.70, fcf_margin: 0.10}
+  margin_expansion: {revenue_cagr_3y_min: 0.03, ebitda_margin_change_3y: 0.02}
+  turnaround: {past_roic_max: 0.08, recent_revenue_growth_min: 0.0, margin_change_min: 0.01}
+  value_opportunity: {ev_ebitda_discount: 0.20, min_fundamental_score: 0.45}
+  leveraged_opportunity: {fcf_conversion: 0.60, max_net_debt_to_ebitda: 1.5, min_interest_coverage: 5.0, max_margin_volatility: 0.03}
+
+red_flags:
+  receivables_vs_revenue_gap: 0.10     # receivables growth exceeds revenue growth by >10pp
+  margin_compression_pp: 0.02          # EBITDA margin down >2pp YoY
+  roic_decline_pp: 0.03
+  low_fcf_conversion: 0.30
+  ocf_ebitda_divergence: 0.60          # 3y OCF/EBITDA below this
+  leverage_increase_x: 0.75            # ND/EBITDA up by >0.75x YoY
+  min_interest_coverage: 2.5
+  debt_growth: 0.30                    # gross debt up >30% YoY
+  dso_increase_days: 10
+  dio_increase_days: 15
+  ccc_increase_days: 15
+  revenue_volatility: 0.15
+  pat_ebitda_divergence_pp: 0.15       # PAT growth lags EBITDA growth by >15pp
+
+# Industries where Ind AS 116 (effective FY2020) materially moved lease costs below EBITDA.
+ind_as_116_sensitive_industries:
+  - Retail
+  - Consumer Services
+  - Healthcare Services
+  - Airlines
+  - Hotels & Restaurants
+  - Telecommunication
