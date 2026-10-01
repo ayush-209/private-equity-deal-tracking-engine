@@ -50,7 +50,8 @@ with left:
     st.plotly_chart(fig, width="stretch")
 with right:
     d = t.dropna(subset=["revenue_cagr_3y", "roic"]).copy()
-    d["size"] = d.market_cap.fillna(d.market_cap.median()).clip(lower=1) ** 0.5
+    mc = d.market_cap.astype(float).where(lambda s: s > 0)
+    d["size"] = mc.fillna(mc.median()).fillna(1.0) ** 0.5
     fig = px.scatter(d, x="revenue_cagr_3y", y="roic", color="archetype", size="size", size_max=26, height=380,
                      hover_name="company_name", color_discrete_map=ARCHETYPE_COLORS,
                      hover_data={"size": False, "total_score": ":.0f", "revenue_cagr_3y": ":.1%", "roic": ":.1%"},
