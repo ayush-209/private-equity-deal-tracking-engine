@@ -23,12 +23,12 @@ def database_url() -> str:
     return os.getenv("DATABASE_URL", "postgresql+psycopg2://pe:pe@localhost:5432/pe_deals")
 
 
-def anthropic_api_key() -> str | None:
-    return os.getenv("ANTHROPIC_API_KEY") or None
+def gemini_api_key() -> str | None:
+    return os.getenv("GEMINI_API_KEY") or None
 
 
-def anthropic_model() -> str:
-    return os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+def gemini_model() -> str:
+    return os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 
 CRORE = 1e7  # 1 crore = 10,000,000 rupees. All monetary values in the database are stored in ₹ crore.
