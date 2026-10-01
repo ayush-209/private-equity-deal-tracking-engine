@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from src.ai.research import build_fact_pack, chunk_filing, fact_pack_json, generate
-from src.config import anthropic_api_key, anthropic_model
+from src.config import gemini_api_key, gemini_model
 from src.database import repository as repo
 from src.reporting.exports import to_json_bytes
 from src.ui import state
@@ -36,9 +36,9 @@ if up is not None:
 with st.expander(f"Fact pack ({len(facts)} facts)"):
     st.dataframe(pd.DataFrame(facts)[["id", "label", "value", "source", "as_of"]], hide_index=True, width="stretch")
 
-if not anthropic_api_key():
-    st.warning("Set ANTHROPIC_API_KEY in .env to enable generation. Everything else on this page works without it.")
-go = st.button("Generate research note", type="primary", disabled=not anthropic_api_key())
+if not gemini_api_key():
+    st.warning("Set GEMINI_API_KEY in Streamlit Secrets to enable generation. Everything else on this page works without it.")
+go = st.button("Generate research note", type="primary", disabled=not gemini_api_key())
 if go:
     with st.spinner("Drafting from the fact pack…"):
         out = generate(facts, filings)
@@ -70,4 +70,4 @@ if len(hist):
                 st.markdown(row.output)
                 st.divider()
 else:
-    st.caption(f"No notes generated yet for this company. Model: {anthropic_model()}.")
+    st.caption(f"No notes generated yet for this company. Model: {gemini_model()}.")
