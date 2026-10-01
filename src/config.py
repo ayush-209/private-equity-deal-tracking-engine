@@ -28,7 +28,7 @@ def gemini_api_key() -> str | None:
 
 
 def gemini_model() -> str:
-    return os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    return os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 
 CRORE = 1e7  # 1 crore = 10,000,000 rupees. All monetary values in the database are stored in ₹ crore.
