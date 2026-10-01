@@ -15,20 +15,56 @@ state.provenance(uni)
 
 total = len(t) + len(uni.excluded)
 passing = t[t.passes_screen]
+
+quality_ok = t.data_quality.isin(["High", "Medium"])
+no_critical_flags = t.critical_flags == 0
+further_investigation = int((quality_ok & no_critical_flags).sum())
+
 c = st.columns(6)
-c[0].metric("Universe", f"{total:,}", help="All companies with stored statements, incl. excluded financials")
-c[1].metric("Passing", f"{len(passing):,}", help="Score ≥ threshold, data quality High/Medium, no critical flags, all dimensions scored")
-c[2].metric("Median score", f"{t.total_score.median():.0f}/100")
-c[3].metric("Median ROIC", pct(t.roic.median()))
-c[4].metric("Median EBITDA gr.", pct(t.ebitda_growth.median()))
-c[5].metric("Median ND/EBITDA", mult(t.net_debt_to_ebitda.median()))
+c[0].metric(
+    "Universe",
+    f"{total:,}",
+    help="All companies with stored statements, incl. excluded financials"
+)
+c[1].metric(
+    "Further investigation",
+    f"{further_investigation:,}",
+    help="Companies clearing the operating, data-quality and critical-risk filters. "
+         "Strict investment pass additionally requires all scoring dimensions to be sufficiently populated."
+)
+c[2].metric(
+    "Median score",
+    f"{t.total_score.median():.0f}/100"
+)
+c[3].metric(
+    "Median ROIC",
+    pct(t.roic.median())
+)
+c[4].metric(
+    "Median EBITDA gr.",
+    pct(t.ebitda_growth.median())
+)
+c[5].metric(
+    "Median ND/EBITDA",
+    mult(t.net_debt_to_ebitda.median())
+)
+
+st.caption(
+    "Further investigation includes companies that clear the operating, "
+    "data-quality and critical-risk filters. A strict investment pass also "
+    "requires sufficient data across all scoring dimensions."
+)
 
 left, right = st.columns([1, 1.25])
 with left:
-    stages = [("Universe", total), ("Operating companies", len(t)),
-              ("Data quality High/Medium", int(t.data_quality.isin(["High", "Medium"]).sum())),
-              ("No critical red flags", int(((t.critical_flags == 0) & t.data_quality.isin(["High", "Medium"])).sum())),
-              ("Pass screen", len(passing)), ("Pipeline", len(repo.load_pipeline()))]
+    stages = [
+    ("Universe", total),
+    ("Operating companies", len(t)),
+    ("Data quality High/Medium", int(quality_ok.sum())),
+    ("No critical red flags", further_investigation),
+    ("Strict investment pass", len(passing)),
+    ("Pipeline", len(repo.load_pipeline()))
+    ]
     fig = go.Figure(go.Funnel(y=[s for s, _ in stages], x=[n for _, n in stages], marker_color=TEAL,
                               textinfo="value+percent initial"))
     fig.update_layout(title="Screening funnel", height=380)
@@ -60,7 +96,7 @@ with right:
     fig.update_layout(legend_title_text="")
     st.plotly_chart(fig, width="stretch")
 
-st.subheader("Archetypes among companies passing the screen")
+st.subheader("Archetypes among companies meeting the strict investment screen")
 a = passing.archetype.value_counts().rename_axis("Archetype").reset_index(name="Companies")
 st.dataframe(a, hide_index=True, width="content")
 if len(uni.excluded):
