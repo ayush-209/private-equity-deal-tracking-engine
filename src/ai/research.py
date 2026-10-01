@@ -15,7 +15,7 @@ import re
 
 import pandas as pd
 
-from src.config import anthropic_api_key, anthropic_model
+from src.config import gemini_api_key, gemini_model
 
 SECTIONS = ["Company Overview", "Financial Highlights", "Potential Value-Creation Drivers", "Key Risks",
             "Valuation Observations", "Potential Investment Thesis", "Counter-Thesis", "Due-Diligence Questions",
@@ -144,20 +144,41 @@ def _num(tok: str):
 
 
 def generate(facts: list[dict], filings: list[dict], max_tokens: int = 2500) -> dict:
-    key = anthropic_api_key()
+    key = gemini_api_key()
+
     if not key:
-        return {"error": "ANTHROPIC_API_KEY is not set. The fact pack below is what the model would receive."}
-    import anthropic
-    client = anthropic.Anthropic(api_key=key)
+        return {
+            "error": "GEMINI_API_KEY is not set. "
+                     "The fact pack below is what the model would receive."
+        }
+
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=key)
+
+    prompt = build_prompt(facts, filings)
+
     try:
-        msg = client.messages.create(model=anthropic_model(), max_tokens=max_tokens, system=SYSTEM_PROMPT,
-                                     messages=[{"role": "user", "content": build_prompt(facts, filings)}])
-    except anthropic.RateLimitError:
-        return {"error": "Rate limited by the API. Wait a minute and retry."}
-    except anthropic.APIError as exc:
-        return {"error": f"API error: {exc}"}
-    text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-    return {"text": text, "model": anthropic_model(), "unverified": verify_numbers(text, facts)}
+        response = client.models.generate_content(
+            model=gemini_model(),
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                max_output_tokens=max_tokens,
+            ),
+        )
+
+        text = response.text or ""
+
+    except Exception as exc:
+        return {"error": f"Gemini API error: {exc}"}
+
+    return {
+        "text": text,
+        "model": gemini_model(),
+        "unverified": verify_numbers(text, facts),
+    }
 
 
 def fact_pack_json(facts: list[dict]) -> dict:
