@@ -27,7 +27,7 @@ c[0].metric(
     help="All companies with stored statements, incl. excluded financials"
 )
 c[1].metric(
-    "Further investigation",
+    "Candidates",
     f"{further_investigation:,}",
     help="Companies clearing the operating, data-quality and critical-risk filters. "
          "Strict investment pass additionally requires all scoring dimensions to be sufficiently populated."
@@ -50,9 +50,9 @@ c[5].metric(
 )
 
 st.caption(
-    "Further investigation includes companies that clear the operating, "
-    "data-quality and critical-risk filters. A strict investment pass also "
-    "requires sufficient data across all scoring dimensions."
+    f"{further_investigation:,} companies clear the initial screening filters. "
+    f"Strict investment pass: {len(passing):,}. "
+    "A strict pass requires sufficient data across all scoring dimensions."
 )
 
 left, right = st.columns([1, 1.25])
@@ -61,9 +61,7 @@ with left:
     ("Universe", total),
     ("Operating companies", len(t)),
     ("Data quality High/Medium", int(quality_ok.sum())),
-    ("No critical red flags", further_investigation),
-    ("Strict investment pass", len(passing)),
-    ("Pipeline", len(repo.load_pipeline()))
+    ("No critical red flags", further_investigation)
     ]
     fig = go.Figure(go.Funnel(y=[s for s, _ in stages], x=[n for _, n in stages], marker_color=TEAL,
                               textinfo="value+percent initial"))
