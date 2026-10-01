@@ -68,11 +68,21 @@ with left:
     fig.update_layout(title="Screening funnel", height=380)
     st.plotly_chart(fig, width="stretch")
 with right:
-    sec = t.groupby("sector").agg(companies=("company_id", "size"), passing=("passes_screen", "sum")).reset_index()
-    sec = sec.melt("sector", var_name="group", value_name="n")
-    fig = px.bar(sec, y="sector", x="n", color="group", barmode="group", orientation="h", height=380,
-                 title="Sector distribution", labels={"n": "Companies", "sector": ""})
-    fig.update_layout(legend_title_text="", yaxis={"categoryorder": "total ascending"})
+    sec = t.groupby("sector").size().reset_index(name="companies")
+
+    fig = px.bar(
+        sec,
+        y="sector",
+        x="companies",
+        orientation="h",
+        height=380,
+        title="Sector distribution",
+        labels={"companies": "Companies", "sector": ""}
+    )
+    
+    fig.update_layout(
+        yaxis={"categoryorder": "total ascending"}
+    )
     st.plotly_chart(fig, width="stretch")
 
 left, right = st.columns([1, 1.25])
