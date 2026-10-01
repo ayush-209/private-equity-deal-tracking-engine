@@ -19,6 +19,7 @@ passing = t[t.passes_screen]
 quality_ok = t.data_quality.isin(["High", "Medium"])
 no_critical_flags = t.critical_flags == 0
 further_investigation = int((quality_ok & no_critical_flags).sum())
+candidates = t[quality_ok & no_critical_flags]
 
 c = st.columns(6)
 c[0].metric(
@@ -87,9 +88,14 @@ with right:
 
 left, right = st.columns([1, 1.25])
 with left:
-    fig = px.histogram(t, x="total_score", nbins=25, color="passes_screen", height=380, title="Score distribution",
-                       labels={"total_score": "Screening score", "passes_screen": "Passes"},
-                       color_discrete_map={True: TEAL, False: "#C9D2D2"})
+    fig = px.histogram(
+    t,
+    x="total_score",
+    nbins=25,
+    height=380,
+    title="Score distribution",
+    labels={"total_score": "Screening score"}
+    )
     fig.add_vline(x=screening_config()["pass_rules"]["min_total_score"], line_dash="dot")
     st.plotly_chart(fig, width="stretch")
 with right:
@@ -104,8 +110,15 @@ with right:
     fig.update_layout(legend_title_text="")
     st.plotly_chart(fig, width="stretch")
 
-st.subheader("Archetypes among companies meeting the strict investment screen")
-a = passing.archetype.value_counts().rename_axis("Archetype").reset_index(name="Companies")
+st.subheader("Archetypes among screening candidates")
+
+a = (
+    candidates.archetype
+    .value_counts()
+    .rename_axis("Archetype")
+    .reset_index(name="Companies")
+)
+
 st.dataframe(a, hide_index=True, width="content")
 if len(uni.excluded):
     with st.expander(f"{len(uni.excluded)} financial-sector companies excluded from the operating screen"):
