@@ -39,7 +39,7 @@ LATEST_VIEWS = [
     """CREATE VIEW v_market_latest AS
        SELECT * FROM (
          SELECT md.*, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY date DESC, ingested_at DESC) AS rn
-         FROM market_data md) t WHERE rn = 1""",
+         FROM market_data md WHERE market_cap IS NOT NULL) t WHERE rn = 1""",
     "DROP VIEW IF EXISTS v_ownership_latest",
     """CREATE VIEW v_ownership_latest AS
        SELECT * FROM (
@@ -135,8 +135,7 @@ def load_market_latest(as_of: dt.date | None = None, engine=None) -> pd.DataFram
         return read_df("SELECT * FROM v_market_latest", engine=engine)
     return read_df("""SELECT * FROM (
         SELECT md.*, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY date DESC, ingested_at DESC) rn
-        FROM market_data md WHERE date <= :d) t WHERE rn = 1""", {"d": as_of}, engine=engine)
-
+        FROM market_data md WHERE date <= :d AND market_cap IS NOT NULL) t WHERE rn = 1""", {"d": as_of}, engine=engine)
 
 def load_market_history(company_id: int, engine=None) -> pd.DataFrame:
     return read_df("SELECT date, share_price, market_cap, enterprise_value FROM market_data "
