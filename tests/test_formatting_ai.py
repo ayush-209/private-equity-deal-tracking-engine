@@ -39,23 +39,22 @@ def test_chunking():
 def test_generate_parses_response_and_verifies(monkeypatch):
     import types
 
-    import anthropic
+    import google.genai as genai
 
     from src.ai import research
 
-    class FakeMessages:
-        def create(self, **kw):
-            assert "FACT PACK" in kw["messages"][0]["content"] and kw["system"]
-            return types.SimpleNamespace(content=[types.SimpleNamespace(type="text",
-                                         text="## Financial Highlights\nRevenue ₹12,345 cr [M1]; margin may hit 30.0%.")])
+    class FakeModels:
+        def generate_content(self, **kw):
+            assert "FACT PACK" in kw["contents"]
+            return types.SimpleNamespace(text="## Financial Highlights\nRevenue ₹12,345 cr [M1]; margin may hit 30.0%.")
 
-    monkeypatch.setattr(research, "anthropic_api_key", lambda: "test")
-    monkeypatch.setattr(anthropic, "Anthropic", lambda api_key: types.SimpleNamespace(messages=FakeMessages()))
+    monkeypatch.setattr(research, "gemini_api_key", lambda: "test")
+    monkeypatch.setattr(genai, "Client", lambda api_key: types.SimpleNamespace(models=FakeModels()))
     out = research.generate(FACTS, [])
     assert "Revenue" in out["text"] and out["unverified"] == ["30.0%"]
 
 
 def test_generate_without_key(monkeypatch):
     from src.ai import research
-    monkeypatch.setattr(research, "anthropic_api_key", lambda: None)
+    monkeypatch.setattr(research, "gemini_api_key", lambda: None)
     assert "error" in research.generate(FACTS, [])
