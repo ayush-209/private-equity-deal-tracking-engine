@@ -175,6 +175,9 @@ class YFinanceAdapter(Adapter):
             return pd.DataFrame()
         sh_cr = shares / CRORE
         df = pd.DataFrame({"date": [d.date() for d in hist.index], "share_price": hist["Close"].values})
+        df = df.dropna(subset=["share_price"]).reset_index(drop=True)
+        if df.empty:
+            return pd.DataFrame()
         df["shares_outstanding_cr"] = sh_cr
         df["market_cap"] = df.share_price * sh_cr        # current share count applied to history: approximate
         df["enterprise_value"] = None                     # computed against the matching balance sheet downstream
