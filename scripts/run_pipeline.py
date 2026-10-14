@@ -60,6 +60,9 @@ def main():
     p.add_argument("--source", default="yfinance", choices=["yfinance", "csv", "demo"])
     p.add_argument("--index", default="nifty500")
     p.add_argument("--limit", type=int, default=None, help="Only the first N tickers (for testing)")
+    p.add_argument("--workers", type=int, default=4, help="Companies fetched in parallel")
+    p.add_argument("--max-minutes", type=float, default=None,
+                   help="Stop fetching after this long; what was loaded is kept and the run is marked partial")
     a = p.parse_args()
     repo.init_db()
     if a.job == "init":
@@ -73,18 +76,19 @@ def main():
     ad = get_adapter(a.source)
     uni = get_universe(ad, a.index)
     if a.job == "universe":
-        ingest(ad, uni, jobs=(), limit=a.limit)
+        ingest(ad, uni, jobs=(), limit=a.limit, workers=a.workers, max_minutes=a.max_minutes)
     elif a.job == "market":
-        ingest(ad, uni, jobs=("market",), limit=a.limit)
+        ingest(ad, uni, jobs=("market",), limit=a.limit, workers=a.workers, max_minutes=a.max_minutes)
         ingest_benchmark(ad, portfolio_config()["benchmark"]["symbols"])
         run_screen()  # multiples and valuation scores move with prices
     elif a.job == "fundamentals":
-        ingest(ad, uni, jobs=("financials", "ownership"), limit=a.limit)
+        ingest(ad, uni, jobs=("financials", "ownership"), limit=a.limit, workers=a.workers,
+               max_minutes=a.max_minutes)
         run_screen()
     elif a.job == "screen":
         run_screen()
     elif a.job == "all":
-        ingest(ad, uni, limit=a.limit)
+        ingest(ad, uni, limit=a.limit, workers=a.workers, max_minutes=a.max_minutes)
         ingest_benchmark(ad, portfolio_config()["benchmark"]["symbols"])
         run_screen()
 

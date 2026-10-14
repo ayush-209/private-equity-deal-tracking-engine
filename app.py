@@ -11,12 +11,7 @@ from src.database.fetch import ensure_local_db  # noqa: E402
 from src.ui import state  # noqa: E402
 
 
-@st.cache_resource(ttl=3600, show_spinner="Fetching the latest data…")
-def _fetch():
-    return ensure_local_db()
-
-
-_fetch()
+st.session_state["data_status"] = ensure_local_db()   # cheap when fresh; retries a failed download every 5 min
 
 st.set_page_config(page_title="PE Deal Intelligence", page_icon="📊", layout="wide")
 

@@ -71,7 +71,8 @@ class _Resp:
 def _sqlite_bytes(tmp_path):
     p = tmp_path / "src.db"
     c = create_engine(f"sqlite:///{p}").connect()
-    c.exec_driver_sql("CREATE TABLE t (x INTEGER)")
+    c.exec_driver_sql("CREATE TABLE companies (company_id INTEGER, filler TEXT)")
+    c.exec_driver_sql("INSERT INTO companies VALUES (1, ?)", ("x" * 6000,))   # large enough to count as a real file
     c.commit(); c.close()
     return p.read_bytes()
 
@@ -79,6 +80,7 @@ def _sqlite_bytes(tmp_path):
 def test_download_replaces_file_and_failures_keep_local_copy(isolated, monkeypatch):
     good = _sqlite_bytes(isolated)
     monkeypatch.setattr(fetch.requests, "get", lambda *a, **k: _Resp(good))
+    monkeypatch.setattr(fetch, "_last_attempt", 0.0)
     assert fetch.ensure_local_db().startswith("downloaded")
     assert (isolated / "pe.db").read_bytes() == good
     assert fetch.ensure_local_db().startswith("local copy")               # fresh: no re-download
@@ -94,3 +96,26 @@ def test_postgres_url_disables_download(isolated, monkeypatch):
     import src.config as cfg
     monkeypatch.setattr(fetch, "is_sqlite", lambda: False)
     assert fetch.ensure_local_db() == "not used"
+
+
+def test_empty_database_file_is_not_treated_as_a_usable_copy(isolated, monkeypatch):
+    eng = repo.get_engine()
+    eng.connect().close()                                                  # creates an empty pe.db, as any early query would
+    repo.init_db(eng)                                                      # tables, but no companies
+    assert not fetch.has_data()
+    good = _sqlite_bytes(isolated)
+    monkeypatch.setattr(fetch.requests, "get", lambda *a, **k: _Resp(good))
+    monkeypatch.setattr(fetch, "_last_attempt", 0.0)
+    assert fetch.ensure_local_db().startswith("downloaded")
+
+
+def test_failed_download_is_retried_after_the_wait(isolated, monkeypatch):
+    calls = []
+    monkeypatch.setattr(fetch.requests, "get", lambda *a, **k: calls.append(1) or _Resp(b"", 404))
+    monkeypatch.setattr(fetch, "_last_attempt", 0.0)
+    assert "download failed" in fetch.ensure_local_db()
+    fetch.ensure_local_db()
+    assert len(calls) == 1                                                 # no hammering GitHub on every rerun
+    monkeypatch.setattr(fetch, "_last_attempt", 0.0)
+    fetch.ensure_local_db()
+    assert len(calls) == 2

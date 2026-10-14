@@ -40,9 +40,10 @@ def universe() -> Universe:
         key = _refresh_key()
         base = _base(key)
     except Exception as exc:  # noqa: BLE001
-        st.error(f"Could not reach the database: {exc}\n\nCheck that data/pe.db exists (the app downloads it from the data branch), "
-                 "or load data with `python -m scripts.run_pipeline demo` (synthetic) or "
-                 "`python -m scripts.run_pipeline all --source yfinance`.")
+        status = st.session_state.get("data_status", "")
+        st.error("No data available yet.\n\nThe app downloads its database from the `data` branch of the GitHub repository, "
+                 "which the data-refresh workflow creates. Run Actions → data-refresh → Run workflow (job `all`) and wait "
+                 f"for it to finish, then reload this page.\n\nDownload status: {status or 'not attempted'}\n\nDetail: {exc}")
         st.stop()
     if base.table.empty:
         st.info("The database has no financial statements yet. Run `python -m scripts.run_pipeline demo` to load the "

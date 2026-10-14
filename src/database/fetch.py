@@ -23,17 +23,39 @@ def db_url() -> str:
     return f"https://raw.githubusercontent.com/{GITHUB_REPO}/{DATA_BRANCH}/pe.db"
 
 
+RETRY_SECONDS = 300
+_last_attempt = 0.0
+last_status = ""
+
+
+def has_data() -> bool:
+    """True only if the local file is a real database with companies in it. An empty file (created by any early
+    connection) must not count as a usable copy."""
+    if not DB_PATH.exists() or DB_PATH.stat().st_size < 4096:
+        return False
+    try:
+        import sqlite3
+        with sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True) as c:
+            return c.execute("SELECT COUNT(*) FROM companies").fetchone()[0] > 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def local_age_hours() -> float | None:
-    return (time.time() - DB_PATH.stat().st_mtime) / 3600 if DB_PATH.exists() else None
+    return (time.time() - DB_PATH.stat().st_mtime) / 3600 if has_data() else None
 
 
 def ensure_local_db(force: bool = False) -> str:
     """Returns a short status string. Never raises: the app should still start if GitHub is unreachable."""
+    global _last_attempt, last_status
     if not is_sqlite() or os.getenv("PE_NO_DOWNLOAD"):
         return "not used"
     age = local_age_hours()
     if not force and age is not None and age < MAX_AGE_HOURS:
         return f"local copy, {age:.1f} h old"
+    if not force and time.time() - _last_attempt < RETRY_SECONDS:
+        return last_status or "waiting to retry"
+    _last_attempt = time.time()
     try:
         r = requests.get(db_url(), timeout=120)
         r.raise_for_status()
@@ -46,7 +68,9 @@ def ensure_local_db(force: bool = False) -> str:
         from src.database import repository as repo
         repo.get_engine.cache_clear()           # connections to the replaced file are stale
         repo.get_workspace_engine.cache_clear()
-        return f"downloaded {len(r.content) / 1e6:.1f} MB"
+        last_status = f"downloaded {len(r.content) / 1e6:.1f} MB"
+        return last_status
     except Exception as exc:  # noqa: BLE001
         log.warning("Could not download the database: %s", exc)
-        return f"download failed ({exc}); " + ("using local copy" if DB_PATH.exists() else "no local copy")
+        last_status = f"download failed ({exc}); " + ("using local copy" if has_data() else "no local copy")
+        return last_status
