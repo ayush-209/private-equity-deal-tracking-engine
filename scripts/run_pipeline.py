@@ -3,7 +3,7 @@
 Examples
   python -m scripts.run_pipeline demo                    # load synthetic demo data + screen
   python -m scripts.run_pipeline universe --index nifty500
-  python -m scripts.run_pipeline market                  # daily: prices / market cap
+  python -m scripts.run_pipeline market                  # daily: prices / market cap / benchmark index
   python -m scripts.run_pipeline fundamentals            # periodic: annual statements + ownership
   python -m scripts.run_pipeline screen                  # recalc metrics, valuation, screening
   python -m scripts.run_pipeline all --source yfinance
@@ -17,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.config import ROOT, screening_config  # noqa: E402
-from src.data_ingestion.pipeline import ingest  # noqa: E402
+from src.config import ROOT, portfolio_config, screening_config  # noqa: E402
+from src.data_ingestion.pipeline import ingest, ingest_benchmark  # noqa: E402
 from src.database import repository as repo  # noqa: E402
 from src.screening.universe import build_universe, persist_screen  # noqa: E402
 
@@ -67,6 +67,7 @@ def main():
     if a.job == "demo":
         ad = get_adapter("demo")
         ingest(ad, ad.universe())
+        ingest_benchmark(ad, portfolio_config()["benchmark"]["symbols"])
         run_screen()
         return
     ad = get_adapter(a.source)
@@ -75,6 +76,7 @@ def main():
         ingest(ad, uni, jobs=(), limit=a.limit)
     elif a.job == "market":
         ingest(ad, uni, jobs=("market",), limit=a.limit)
+        ingest_benchmark(ad, portfolio_config()["benchmark"]["symbols"])
         run_screen()  # multiples and valuation scores move with prices
     elif a.job == "fundamentals":
         ingest(ad, uni, jobs=("financials", "ownership"), limit=a.limit)
@@ -83,6 +85,7 @@ def main():
         run_screen()
     elif a.job == "all":
         ingest(ad, uni, limit=a.limit)
+        ingest_benchmark(ad, portfolio_config()["benchmark"]["symbols"])
         run_screen()
 
 

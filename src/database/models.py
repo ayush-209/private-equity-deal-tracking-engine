@@ -47,6 +47,7 @@ financials = Table(
     Column("cash", Float), Column("receivables", Float), Column("inventory", Float),
     Column("payables", Float), Column("interest_expense", Float),
     Column("dividends_paid", Float),
+    Column("current_liabilities", Float),   # added for ROCE (capital employed = total assets - current liabilities)
     Column("source", String(64), nullable=False),
     Column("ingested_at", DateTime, nullable=False, server_default=func.now()),
     UniqueConstraint("company_id", "fiscal_year", "source", "ingested_at", name="uq_fin_version"),
@@ -64,6 +65,17 @@ market_data = Table(
     Column("source", String(64), nullable=False),
     Column("ingested_at", DateTime, nullable=False, server_default=func.now()),
     UniqueConstraint("company_id", "date", "source", name="uq_market_obs"),
+)
+
+benchmark_prices = Table(   # index levels (monthly) used as the market proxy for beta
+    "benchmark_prices", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("symbol", String(32), nullable=False),
+    Column("date", Date, nullable=False),
+    Column("close", Float),
+    Column("source", String(64), nullable=False),
+    Column("ingested_at", DateTime, nullable=False, server_default=func.now()),
+    UniqueConstraint("symbol", "date", name="uq_bench_obs"),
 )
 
 ownership = Table(
@@ -175,5 +187,5 @@ data_issues = Table(
 FINANCIAL_FIELDS = [
     "revenue", "cost_of_revenue", "ebitda", "ebit", "depreciation", "pretax_income", "tax_expense", "pat",
     "eps", "operating_cash_flow", "capex", "free_cash_flow", "total_assets", "total_equity", "total_debt",
-    "cash", "receivables", "inventory", "payables", "interest_expense", "dividends_paid",
+    "cash", "receivables", "inventory", "payables", "interest_expense", "dividends_paid", "current_liabilities",
 ]

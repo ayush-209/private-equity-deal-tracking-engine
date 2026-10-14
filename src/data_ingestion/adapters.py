@@ -96,6 +96,10 @@ class Adapter(ABC):
     def ownership(self, ticker: str) -> pd.DataFrame:
         return pd.DataFrame()
 
+    def benchmark(self, symbols: list[str]) -> pd.DataFrame:
+        """Monthly index closes (columns symbol, date, close, source) for the first symbol that returns data."""
+        return pd.DataFrame()
+
 
 # ---------------------------------------------------------------- yfinance
 YF_MAP = {
@@ -116,6 +120,7 @@ YF_MAP = {
     "receivables": ["Accounts Receivable", "Receivables"],
     "inventory": ["Inventory"],
     "payables": ["Accounts Payable", "Payables"],
+    "current_liabilities": ["Current Liabilities", "Total Current Liabilities"],
     "operating_cash_flow": ["Operating Cash Flow"],
     "capex": ["Capital Expenditure"],
     "free_cash_flow": ["Free Cash Flow"],
@@ -183,6 +188,25 @@ class YFinanceAdapter(Adapter):
         df["enterprise_value"] = None                     # computed against the matching balance sheet downstream
         df["source"] = "yfinance (historic mcap uses current share count)"
         return df
+
+    def benchmark(self, symbols: list[str]) -> pd.DataFrame:
+        import yfinance as yf
+        frames = []
+        for sym in symbols:           # keep every symbol that works; scoring picks by preference order
+            try:
+                hist = with_retry(lambda: yf.Ticker(sym).history(period="10y", interval="1mo", auto_adjust=False))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Benchmark %s unavailable: %s", sym, exc)
+                continue
+            if hist is None or hist.empty:
+                continue
+            d = pd.DataFrame({"symbol": sym, "date": [x.date() for x in hist.index], "close": hist["Close"].values})
+            d = d.dropna(subset=["close"])
+            if not d.empty:
+                d["source"] = "yfinance"
+                frames.append(d)
+            time.sleep(self.pause)
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     def ownership(self, ticker: str) -> pd.DataFrame:
         tk = self._ticker(ticker)

@@ -45,3 +45,9 @@ def screening_config() -> dict:
 def sector_config() -> dict:
     with open(CONFIG_DIR / "sectors.yaml", encoding="utf-8") as fh:
         return yaml.safe_load(fh)
+
+
+@lru_cache
+def portfolio_config() -> dict:
+    with open(CONFIG_DIR / "portfolio.yaml", encoding="utf-8") as fh:
+        return yaml.safe_load(fh)

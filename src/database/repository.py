@@ -23,9 +23,26 @@ def get_engine(url: str | None = None) -> Engine:
 def init_db(engine: Engine | None = None) -> None:
     engine = engine or get_engine()
     m.metadata.create_all(engine)
+    _migrate(engine)
     with engine.begin() as conn:
         for stmt in LATEST_VIEWS:
             conn.execute(text(stmt))
+
+
+# Columns added after the first release. create_all() never alters an existing table, so each is added here.
+# Safe to run repeatedly; no manual SQL needed on a database created by an older version.
+MIGRATIONS = [("financials", "current_liabilities", "FLOAT")]
+
+
+def _migrate(engine: Engine) -> None:
+    from sqlalchemy import inspect
+    insp = inspect(engine)
+    for table, column, ddl_type in MIGRATIONS:
+        if table in insp.get_table_names() and column not in {c["name"] for c in insp.get_columns(table)}:
+            with engine.begin() as conn:
+                conn.execute(text(f"DROP VIEW IF EXISTS v_financials_latest"))  # a SELECT * view pins old columns
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+            log.info("Migrated: added %s.%s", table, column)
 
 
 # Latest version per (company, period): ingestion is append-only, these views resolve the current figure.
@@ -136,6 +153,29 @@ def load_market_latest(as_of: dt.date | None = None, engine=None) -> pd.DataFram
     return read_df("""SELECT * FROM (
         SELECT md.*, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY date DESC, ingested_at DESC) rn
         FROM market_data md WHERE date <= :d AND market_cap IS NOT NULL) t WHERE rn = 1""", {"d": as_of}, engine=engine)
+
+def append_benchmark_rows(rows: list[dict], engine: Engine | None = None) -> int:
+    """Index observations are unique per (symbol, date); skip ones already stored."""
+    if not rows:
+        return 0
+    engine = engine or get_engine()
+    with engine.begin() as conn:
+        existing = set(conn.execute(select(m.benchmark_prices.c.symbol, m.benchmark_prices.c.date)).all())
+        new = [r for r in rows if (r["symbol"], r["date"]) not in existing]
+        if new:
+            conn.execute(insert(m.benchmark_prices), new)
+    return len(new)
+
+
+def load_benchmark(engine=None) -> pd.DataFrame:
+    return read_df("SELECT symbol, date, close FROM benchmark_prices ORDER BY symbol, date", engine=engine)
+
+
+def load_price_panel(engine=None) -> pd.DataFrame:
+    """Monthly closes for every company: company_id, date, share_price (one row per company-month)."""
+    return read_df("SELECT company_id, date, share_price FROM market_data WHERE share_price IS NOT NULL "
+                   "ORDER BY company_id, date", engine=engine)
+
 
 def load_market_history(company_id: int, engine=None) -> pd.DataFrame:
     return read_df("SELECT date, share_price, market_cap, enterprise_value FROM market_data "

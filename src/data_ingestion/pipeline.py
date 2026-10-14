@@ -94,3 +94,22 @@ def ingest(adapter, universe: pd.DataFrame, jobs=("financials", "market", "owner
     repo.finish_run(run_id, status, ok, failed, "\n".join(errors[:50]), engine)
     log.info("Run %s finished: %s ok, %s failed", run_id, ok, failed)
     return run_id
+
+
+def ingest_benchmark(adapter, symbols: list[str], engine=None) -> int:
+    """Load the market-index series used for beta. Failure is logged, never fatal: the class-basis score then
+    simply has no beta and says so."""
+    engine = engine or repo.get_engine()
+    repo.init_db(engine)
+    try:
+        df = adapter.benchmark(symbols)
+    except Exception:  # noqa: BLE001
+        log.exception("Benchmark download failed")
+        return 0
+    if df is None or df.empty:
+        log.warning("No benchmark data returned for %s", symbols)
+        return 0
+    df = df.assign(ingested_at=dt.datetime.now())
+    n = repo.append_benchmark_rows(_clean(df.to_dict("records")), engine)
+    log.info("Benchmark: %s new monthly rows (%s)", n, ", ".join(sorted(df.symbol.unique())))
+    return n

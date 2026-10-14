@@ -33,7 +33,7 @@ INDUSTRIES = {  # industry: (margin, capital intensity, base EV/EBITDA, DSO, DIO
 PROFILES = ["compounder", "cash_cow", "margin_expander", "turnaround", "value", "steady", "leveraged_ok",
             "distressed", "receivables_inflator", "cyclical", "steady", "compounder"]
 SYL = ["Ara", "Vel", "Kri", "Sur", "Nav", "Ind", "Shi", "Pra", "Tam", "Utk", "Dha", "Rav", "Ved", "Kal", "Ama",
-       "Sat", "Har", "Nir", "Bha", "Dev"]
+       "Sat", "Har", "Nir", "Bha", "Dev", "Mog", "Zen", "Lav", "Pil", "Ras", "Tor", "Yam", "Gan", "Jai", "Ome"]
 SUF = ["ra", "tek", "van", "mira", "lok", "jit", "sha", "dra", "gir", "pur", "sen", "nova"]
 IND_WORD = {"Fast Moving Consumer Goods": "Consumer", "Information Technology": "Infotech", "Chemicals": "Chemicals",
             "Capital Goods": "Engineering", "Automobile and Auto Components": "Autoparts", "Healthcare": "Pharma",
@@ -72,9 +72,13 @@ def _profile_paths(profile: str, n: int, rng: np.random.Generator):
 class DemoAdapter(Adapter):
     source = SOURCE
 
-    def __init__(self, n_per_industry: int = 14, seed: int = 7, as_of: dt.date | None = None):
+    def __init__(self, n_per_industry: int = 22, seed: int = 7, as_of: dt.date | None = None):
         self.rng = np.random.default_rng(seed)
         self.as_of = as_of or dt.date(2026, 9, 30)
+        # Separate stream so the market factor does not change any existing demo company's fundamentals.
+        self.mrng = np.random.default_rng(seed + 1)
+        months = pd.date_range(dt.date(FY_START, 6, 30), self.as_of, freq="ME")
+        self._factor = pd.Series(np.cumsum(self.mrng.normal(0.008, 0.045, len(months))), index=months)
         self._universe, self._fin, self._mkt, self._own = self._build(n_per_industry)
 
     def universe(self) -> pd.DataFrame:
@@ -88,6 +92,11 @@ class DemoAdapter(Adapter):
 
     def ownership(self, ticker: str) -> pd.DataFrame:
         return self._own.get(ticker, pd.DataFrame())
+
+    def benchmark(self, symbols: list[str]) -> pd.DataFrame:
+        sym = symbols[0] if symbols else "^DEMO"
+        return pd.DataFrame({"symbol": sym, "date": [d.date() for d in self._factor.index],
+                             "close": (1000 * np.exp(self._factor.values)).round(2), "source": SOURCE})
 
     # ------------------------------------------------------------
     def _build(self, n_per):
@@ -165,7 +174,8 @@ class DemoAdapter(Adapter):
                  "eps": pat / 10, "operating_cash_flow": ocf, "capex": capex, "free_cash_flow": fcf,
                  "total_assets": equity + debt + payables * 1.5, "total_equity": equity, "total_debt": debt,
                  "cash": cash, "receivables": receivables, "inventory": inventory, "payables": payables,
-                 "interest_expense": interest, "dividends_paid": divs, "source": SOURCE, "_nwc": nwc}
+                 "interest_expense": interest, "dividends_paid": divs, "source": SOURCE, "_nwc": nwc,
+                 "current_liabilities": payables + max(debt, 0) * 0.3 + rev * 0.03}
             if k % 13 == 7 and i == n - 1:      # missing working-capital fields on a few names
                 r["receivables"] = r["inventory"] = None
             rows.append(r)
@@ -176,12 +186,13 @@ class DemoAdapter(Adapter):
                   "receivables_inflator": 1.1, "cyclical": 0.85}.get(profile, 1.0)
         months = pd.date_range(dt.date(FY_START, 6, 30), self.as_of, freq="ME")
         mrows = []
+        beta = float(self.mrng.uniform(0.5, 1.6))     # each demo company has its own true market sensitivity
         for d in months:
             avail = fin[pd.to_datetime(fin.filing_date) <= d]
             if avail.empty:
                 continue
             last = avail.iloc[-1]
-            ev = mult * rating * max(last.ebitda, last.revenue * 0.02) * float(np.exp(rng.normal(0, 0.08)))
+            ev = mult * rating * max(last.ebitda, last.revenue * 0.02) * float(np.exp(rng.normal(0, 0.08) + beta * self._factor[d]))
             mcap = max(ev - (last.total_debt - last.cash), last.revenue * 0.15)
             mrows.append({"date": d.date(), "share_price": round(mcap / 10, 2), "shares_outstanding_cr": 10.0,
                           "market_cap": mcap, "enterprise_value": None, "source": SOURCE})

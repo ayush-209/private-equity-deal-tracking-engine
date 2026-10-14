@@ -1,0 +1,92 @@
+# Class-basis scoring and portfolio construction (see docs/METHODOLOGY.md, section "Class basis").
+# Every number here is a policy choice, not a fact. The "why" next to each weight is shown in the app.
+
+benchmark:
+  # Market proxy for beta, in preference order. Yahoo tickers. All that load are stored.
+  symbols: ["^CRSLDX", "^NSEI"]        # Nifty 500, Nifty 50
+  min_months: 36
+  max_months: 60
+
+cap_segments:
+  # AMFI convention: ranks by full market capitalisation. Nifty 500 ranks approximate AMFI ranks
+  # because the index holds roughly the 500 largest listed companies.
+  large: {rank_from: 1,   rank_to: 100}
+  mid:   {rank_from: 101, rank_to: 250}
+  small: {rank_from: 251, rank_to: 100000}
+
+eligibility:
+  include_financials: false      # banks/NBFCs: ROCE and sales growth are not comparable; opt in on the page
+  exclude_loss_making: true      # latest-year PAT <= 0
+  min_dimensions: 4              # of 5 scored dimensions must be computable
+  min_segment_peers: 10          # percentiles use the whole eligible universe if a segment is smaller
+
+dimensions:
+  growth:
+    weight: 30
+    why: >-
+      The brief flags YoY growth and EPS as very important. Growth is the largest weight because the
+      objective is capital appreciation, and over a multi-year horizon price follows earnings growth.
+      Sales YoY (business momentum) and EPS growth (what reaches shareholders) are scored equally.
+    metrics:
+      - {metric: sales_yoy,   direction: higher}
+      - {metric: eps_growth,  direction: higher}
+  profitability:
+    weight: 20
+    why: >-
+      Returns on equity and on capital employed separate growth that creates value from growth bought
+      with capital. Quality persistence is the best-documented factor after value and momentum.
+    metrics:
+      - {metric: roe,  direction: higher}
+      - {metric: roce, direction: higher}
+  valuation:
+    weight: 20
+    why: >-
+      Entry price drives realised return. P/E, PEG (price paid per unit of growth) and P/BV together
+      guard against paying for growth that is already priced in. Equal to profitability, below growth.
+    metrics:
+      - {metric: pe,  direction: lower}
+      - {metric: peg, direction: lower}
+      - {metric: pb,  direction: lower}
+  risk:
+    weight: 20
+    why: >-
+      A three-year capital target cannot ignore drawdown risk. Beta (market sensitivity) and standard
+      deviation (total variability) are scored with lower = better, which is a defensive tilt; the
+      weight is the lever for how defensive the portfolio is.
+    metrics:
+      - {metric: beta, direction: lower}
+      - {metric: sd,   direction: lower}
+  technical:
+    weight: 10
+    why: >-
+      Price trend carries information (momentum) but is the noisiest signal and the class notes leave
+      "technicals" undefined, so it gets the smallest weight. Defined here as 6-month return,
+      12-minus-1-month momentum and price vs its 10-month average.
+    metrics:
+      - {metric: ret_6m,   direction: higher}
+      - {metric: mom_12_1, direction: higher}
+      - {metric: trend_10m, direction: higher}
+
+# Alternative weightings for the rank-stability check. If rankings barely move across these, the
+# weights are not driving the result and the debate over them matters less.
+weight_sets:
+  base:          {growth: 30, profitability: 20, valuation: 20, risk: 20, technical: 10}
+  equal:         {growth: 20, profitability: 20, valuation: 20, risk: 20, technical: 20}
+  growth_heavy:  {growth: 45, profitability: 15, valuation: 15, risk: 15, technical: 10}
+  quality_heavy: {growth: 20, profitability: 35, valuation: 20, risk: 15, technical: 10}
+  defensive:     {growth: 20, profitability: 20, valuation: 20, risk: 35, technical: 5}
+  no_technical:  {growth: 35, profitability: 25, valuation: 20, risk: 20, technical: 0}
+
+stability:
+  draws: 300           # random weight vectors drawn around the base weights
+  concentration: 40    # higher = draws stay closer to base (Dirichlet scale)
+  seed: 11
+  top_n: 15
+
+portfolio:
+  capital: 10000000            # Rs 1 crore, an input (editable on the page)
+  names_per_segment: {large: 5, mid: 5, small: 4}
+  min_segment_weight: {large: 0.30, mid: 0.20, small: 0.10}   # floors; "representation across segments"
+  max_position: 0.12
+  max_sector: 0.30
+  weighting: score             # equal | score | inverse_volatility

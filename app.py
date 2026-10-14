@@ -30,6 +30,10 @@ nav = st.navigation({
         st.Page(f"{P}/executive_dashboard.py", title="Executive dashboard", icon="📈", default=True),
         st.Page(f"{P}/deal_universe.py", title="Deal universe", icon="🔎"),
     ],
+    "Portfolio": [
+        st.Page(f"{P}/class_scoring.py", title="Class-basis scoring", icon="🧮"),
+        st.Page(f"{P}/portfolio_builder.py", title="Portfolio builder", icon="🧺"),
+    ],
     "Company": [
         st.Page(f"{P}/company_deep_dive.py", title="Company deep dive", icon="🏢"),
         st.Page(f"{P}/comparables.py", title="Comparable companies", icon="⚖️"),

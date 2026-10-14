@@ -69,6 +69,8 @@ secret. Every run is logged in the `pipeline_runs` table and `logs/pipeline.log`
 |---|---|---|
 | Screening | Executive dashboard | Funnel, sector mix, score distribution, growth vs ROIC |
 | | Deal universe | Filterable, sortable table; select a company; CSV/Excel/JSON export |
+| Portfolio | Class-basis scoring | Second ranking by cap segment: growth, profitability, valuation, risk, technicals; the reason for every weight; rank-stability and robustness checks |
+| | Portfolio builder | Top names per segment under position, sector and segment-minimum limits; whole-share allocation of the capital; portfolio beta and SD from the covariance matrix; historical path |
 | Company | Company deep dive | Trends, key metrics, score breakdown with every underlying metric, archetype reasons, red flags, PDF |
 | | Comparable companies | Automatic peer group, multiples vs p25/median/p75, what explains the valuation |
 | | Deal economics | Control (illustrative) or minority/PIPE; sources & uses, debt paydown, value bridge, MOIC/IRR heatmaps |
@@ -98,9 +100,10 @@ src/
   risk/                     Red flags and due-diligence questions
   ai/                       Fact pack, prompt, generation, number verification
   backtest/                 Historical validation
+  portfolio/                Class-basis metrics, scoring, rank stability, portfolio construction
   reporting/                IC summary, PDFs, CSV/Excel/JSON exports
   ui/                       Shared Streamlit state, formatting (₹ crore, lakh crore), charts
-config/                     screening.yaml (weights, thresholds, rules), sectors.yaml
+config/                     screening.yaml (weights, thresholds, rules), sectors.yaml, portfolio.yaml (class basis)
 sql/                        schema.sql (generated), reference queries, seed notes
 scripts/                    run_pipeline.py (CLI), export_schema.py
 tests/                      Unit tests + PostgreSQL integration tests

@@ -235,3 +235,85 @@ nothing about share-price returns and is not evidence of future investment succe
 - **Thresholds are judgement.** Archetype and red-flag thresholds are reasonable defaults, exposed in YAML so they can
   be reviewed and changed.
 - **Sector scope.** Financial-services companies are excluded rather than scored with a bespoke framework.
+
+## 11. Class basis: second ranking and portfolio
+
+A separate scoring system, built from the class framework (size, profitability, valuation, growth, risk, technicals). It
+runs beside the private-equity screen and shares only the data. All settings are in `config/portfolio.yaml`.
+
+### Variables
+
+| Class variable | Definition used |
+|---|---|
+| Market capitalisation | Latest price x shares. Ranked across all companies; rank 1-100 large, 101-250 mid, 251+ small (AMFI convention) |
+| ROE | PAT / average equity |
+| ROCE | EBIT / average (total assets - current liabilities). If current liabilities are missing: EBIT / (equity + debt), flagged approximate and biased low |
+| P/E, P/BV | Market cap / PAT; market cap / total equity. Not meaningful for non-positive denominators |
+| PEG | P/E / (EPS growth in percent). Not meaningful when growth <= 0 |
+| Sales YoY | Revenue / prior-year revenue - 1 |
+| EPS growth | 3-year EPS CAGR (YoY when history is short). Cross-checked against PAT growth; if they differ by more than 50 points a year the PAT figure is used and labelled, because unadjusted splits/bonuses corrupt per-share data |
+| Beta | Slope of monthly stock returns on monthly index returns (Nifty 500, falling back to Nifty 50), latest 36-60 months |
+| Standard deviation | Sample SD of monthly returns x sqrt(12), same window |
+| Technicals | Not defined in the class notes. Used: 6-month return; 12-month return skipping the latest month; price vs 10-month average |
+
+### Scoring
+
+Each metric becomes a percentile **within the company's cap segment** (pooled across segments if one has fewer than 10
+companies). Percentiles are averaged within a dimension, and dimensions are combined with the weights below. A
+dimension needs at least half its metrics; a company needs at least 4 of the 5 dimensions or it is not ranked. Missing
+dimensions re-scale the other weights (never counted as zero). Values where "missing" means "bad" (loss-making P/E, PEG
+with no growth, P/BV on negative equity) are ranked last rather than dropped.
+
+Why score inside the segment: ordinary levels of P/E, volatility and growth differ by size. Scoring across sizes would
+let one segment crowd out the others; scoring within them gives each segment candidates and keeps the comparison fair.
+This is also how market capitalisation influences the result - it decides who competes with whom and how much of the
+portfolio each segment must hold - rather than being a score itself.
+
+### Weights: the basis
+
+The class notes leave "based on what?" open. These defaults are reasoned, not derived, and the app shows the reason
+beside each (and lets you change them).
+
+| Dimension | Weight | Basis |
+|---|---|---|
+| Growth (Sales YoY, EPS growth) | 30 | The notes flag YoY and EPS as very important. Objective is capital appreciation over several years, which follows earnings growth. Sales and EPS growth equal inside the dimension |
+| Profitability (ROE, ROCE) | 20 | Separates growth that creates value from growth bought with capital |
+| Valuation (P/E, PEG, P/BV) | 20 | Entry price drives realised return; PEG and P/BV guard against paying for growth already priced in |
+| Risk (beta, SD; lower is better) | 20 | A fixed-horizon capital goal cannot ignore drawdown. Lower-is-better is a defensive tilt; the weight sets how defensive |
+| Technical | 10 | Momentum carries information but is the noisiest signal and its definition is not given |
+
+### Do the weights matter? (rank stability)
+
+Because weights are ultimately a judgement, the app measures their influence instead of defending them:
+
+1. **Alternative weight sets** (equal, growth-heavy, quality-heavy, defensive, no-technical): Spearman correlation with the
+   base ranking and the share of the base top 15 that survives, per segment.
+2. **Random weightings**: 300 weight vectors drawn (Dirichlet) around the base weights; each company's *selection
+   frequency* is the share of draws in which it lands among its segment's top picks. High frequency = a pick that does not depend on the
+   weights. The portfolio builder can restrict itself to such names.
+
+### Portfolio construction
+
+1. **Select** the top-k by score in each segment (default 5 large, 5 mid, 4 small), skipping a name when its sector would
+   exceed floor(max sector x number of names).
+2. **Size** with a small constrained least-squares problem (SLSQP): weights as close as possible to the target
+   (equal, score-proportional or inverse-volatility) subject to: fully invested, no shorting, maximum position (12%),
+   maximum sector (30%), minimum weight per segment (large 30%, mid 20%, small 10%). If the constraints cannot all
+   hold, the target weights are shown with a message naming the problem.
+3. **Whole shares** at the latest price: round down, then spend leftover cash one share at a time on the position furthest below
+   target. Actual weights and cash left are reported.
+4. **Risk**: portfolio SD = sqrt(w' S w) with S the annualised covariance of monthly returns over the holdings' common window (up to 60
+   months); portfolio beta = slope of the weighted monthly return on the index; diversification = 1 - portfolio SD /
+   weighted-average SD. The historical path holds today's weights constant.
+
+Initial capital is an input (default Rs 1 crore). The app does not model or assume a return target.
+
+### Limitations specific to this section
+
+- Fundamentals cover about five years and are restated; beta from 36-60 monthly points has a wide error band (treat +/-0.2 as noise).
+- The universe is today's Nifty 500: companies that left the index are absent (survivorship bias), and the historical
+  path of today's picks is flattered by hindsight. It shows the ride, not the expected return.
+- Prices are not adjusted for dividends; there is no volume data, so small-cap position sizes are not tested against liquidity.
+- Banks, NBFCs and insurers are excluded by default; ROCE and sales growth are not comparable for lenders.
+- The Yahoo label for current liabilities is "Current Liabilities"; where a company lacks it, ROCE is approximate and labelled.
+
