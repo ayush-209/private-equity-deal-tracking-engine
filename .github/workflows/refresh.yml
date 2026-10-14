@@ -1,5 +1,6 @@
-# Scheduled data refresh. Needs repository secret DATABASE_URL pointing at a reachable PostgreSQL
-# (e.g. Neon, Supabase, RDS). Logs are uploaded as an artifact; every run is also recorded in pipeline_runs.
+# Scheduled data refresh. No external database: the SQLite file lives on the `data` branch. Each run downloads it,
+# appends new data, and force-pushes it back as a single commit (so the repository never grows).
+# Logs are uploaded as an artifact; every run is also recorded in pipeline_runs.
 name: data-refresh
 on:
   schedule:
@@ -8,23 +9,44 @@ on:
   workflow_dispatch:
     inputs:
       job: {description: "market | fundamentals | screen | all", default: "all"}
+      limit: {description: "Only the first N companies (0 = all)", default: "0"}
+permissions:
+  contents: write
+concurrency: data-refresh
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
       - run: pip install -r requirements.txt
+      - name: Fetch current database
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data 2>/dev/null; then git show FETCH_HEAD:pe.db > data/pe.db; echo "Existing database restored"; else echo "No database yet; starting empty"; fi
       - name: Pick job
         id: pick
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "job=${{ inputs.job }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event.schedule }}" = "0 2 * * 0" ]; then echo "job=fundamentals" >> $GITHUB_OUTPUT
           else echo "job=market" >> $GITHUB_OUTPUT; fi
-      - run: python -m scripts.run_pipeline ${{ steps.pick.outputs.job }} --source yfinance
+      - name: Load data
+        timeout-minutes: 150
+        run: |
+          LIMIT="${{ inputs.limit }}"; [ -z "$LIMIT" ] && LIMIT=0
+          python -m scripts.run_pipeline ${{ steps.pick.outputs.job }} --source yfinance --workers 4 --max-minutes 100 $([ "$LIMIT" != "0" ] && echo "--limit $LIMIT")
+      - name: Publish database
+        if: always() && hashFiles('data/pe.db') != ''
+        run: |
+          N=$(python -c "import sqlite3; c=sqlite3.connect('data/pe.db'); print(c.execute('SELECT COUNT(*) FROM companies').fetchone()[0])" 2>/dev/null || echo 0)
+          if [ "$N" = "0" ]; then echo "Database has no companies; not publishing (keeps the last good one)"; exit 0; fi
+          python -c "import sqlite3; c=sqlite3.connect('data/pe.db'); c.execute('VACUUM'); c.close()"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cp data/pe.db /tmp/pub/pe.db && cd /tmp/pub
+          git init -q -b data
+          git config user.name "github-actions" && git config user.email "actions@github.com"
+          git add pe.db && git commit -qm "Database $(date -u +%F)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: pipeline-logs, path: logs/}
