@@ -49,8 +49,7 @@ if remove:
     repo.remove_pipeline_entry(int(cid))
     st.rerun()
 
-hist = repo.read_df("SELECT h.changed_at, c.company_name, h.status, h.note FROM pipeline_history h JOIN companies c "
-                    "USING (company_id) ORDER BY h.changed_at DESC LIMIT 100")
+hist = repo.load_pipeline_history(100)
 if len(hist):
     with st.expander("Status history"):
         st.dataframe(hist, hide_index=True, width="stretch")

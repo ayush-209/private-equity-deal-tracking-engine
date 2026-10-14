@@ -40,8 +40,8 @@ def universe() -> Universe:
         key = _refresh_key()
         base = _base(key)
     except Exception as exc:  # noqa: BLE001
-        st.error(f"Could not reach the database: {exc}\n\nCheck DATABASE_URL in .env and that PostgreSQL is running, "
-                 "then load data with `python -m scripts.run_pipeline demo` (synthetic) or "
+        st.error(f"Could not reach the database: {exc}\n\nCheck that data/pe.db exists (the app downloads it from the data branch), "
+                 "or load data with `python -m scripts.run_pipeline demo` (synthetic) or "
                  "`python -m scripts.run_pipeline all --source yfinance`.")
         st.stop()
     if base.table.empty:

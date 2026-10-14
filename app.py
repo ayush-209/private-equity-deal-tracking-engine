@@ -7,7 +7,16 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import src.ui.charts  # noqa: E402,F401  (registers the Plotly template)
+from src.database.fetch import ensure_local_db  # noqa: E402
 from src.ui import state  # noqa: E402
+
+
+@st.cache_resource(ttl=3600, show_spinner="Fetching the latest data…")
+def _fetch():
+    return ensure_local_db()
+
+
+_fetch()
 
 st.set_page_config(page_title="PE Deal Intelligence", page_icon="📊", layout="wide")
 

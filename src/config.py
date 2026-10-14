@@ -18,9 +18,25 @@ except ImportError:  # pragma: no cover
     pass
 
 
+DATA_DIR = ROOT / "data"
+GITHUB_REPO = os.getenv("PE_GITHUB_REPO", "ayush-209/private-equity-deal-tracking-engine")
+DATA_BRANCH = "data"          # the refresh job publishes pe.db to this branch; the app downloads it
+
+
 def database_url() -> str:
-    """PostgreSQL is the intended backend. SQLite is accepted only for quick local tests."""
-    return os.getenv("DATABASE_URL", "postgresql+psycopg2://pe:pe@localhost:5432/pe_deals")
+    """Default: one SQLite file (data/pe.db) written by the scheduled refresh and read by the app.
+    Set PE_DATABASE_URL to use PostgreSQL instead (Docker / a hosted server)."""
+    return os.getenv("PE_DATABASE_URL") or f"sqlite:///{DATA_DIR / 'pe.db'}"
+
+
+def is_sqlite(url: str | None = None) -> bool:
+    return (url or database_url()).startswith("sqlite")
+
+
+def workspace_url() -> str:
+    """Where the app's own notes live (deal pipeline, AI outputs). Kept apart from the refreshed market data so a
+    new data file never overwrites them. With PostgreSQL everything shares one database."""
+    return f"sqlite:///{DATA_DIR / 'workspace.db'}" if is_sqlite() else database_url()
 
 
 def gemini_api_key() -> str | None:

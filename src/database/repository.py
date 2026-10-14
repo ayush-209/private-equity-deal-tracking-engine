@@ -9,15 +9,38 @@ import pandas as pd
 from sqlalchemy import create_engine, insert, select, text, update
 from sqlalchemy.engine import Engine
 
-from src.config import database_url
+from src.config import DATA_DIR, database_url, is_sqlite, workspace_url
 from src.database import models as m
 
 log = logging.getLogger(__name__)
 
+import sqlite3  # noqa: E402
+
+# Explicit adapters: Python's built-in defaults are deprecated as of 3.12.
+sqlite3.register_adapter(dt.date, lambda d: d.isoformat())
+sqlite3.register_adapter(dt.datetime, lambda d: d.isoformat(" "))
+
 
 @lru_cache
 def get_engine(url: str | None = None) -> Engine:
-    return create_engine(url or database_url(), pool_pre_ping=True, future=True)
+    url = url or database_url()
+    if url.startswith("sqlite"):
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        return create_engine(url, future=True, connect_args={"check_same_thread": False})   # Streamlit uses threads
+    return create_engine(url, pool_pre_ping=True, future=True)
+
+
+WORKSPACE_TABLES = ["deal_pipeline", "pipeline_history", "ai_outputs"]
+
+
+@lru_cache
+def get_workspace_engine() -> Engine:
+    """Engine for notes the app itself writes. SQLite: a separate file, created on first use."""
+    if not is_sqlite():
+        return get_engine()
+    eng = get_engine(workspace_url())
+    m.metadata.create_all(eng, tables=[m.metadata.tables[t] for t in WORKSPACE_TABLES])
+    return eng
 
 
 def init_db(engine: Engine | None = None) -> None:
@@ -127,10 +150,24 @@ def append_market_rows(rows: list[dict], engine: Engine | None = None) -> int:
 
 
 # ---------------------------------------------------------------- reads
+_DATE_COLS = {"date", "period_end", "filing_date", "screening_date", "price_date"}
+_DATETIME_COLS = {"ingested_at", "finished_at", "started_at", "created_at", "updated_at", "added_at", "changed_at",
+                  "last_ingested", "t"}
+
+
 def read_df(sql: str, params: dict | None = None, engine: Engine | None = None) -> pd.DataFrame:
     engine = engine or get_engine()
     with engine.connect() as conn:
-        return pd.read_sql(text(sql), conn, params=params or {})
+        df = pd.read_sql(text(sql), conn, params=params or {})
+    if engine.dialect.name == "sqlite":      # raw SQL returns dates as text in SQLite; restore real dates
+        for c in df.columns:
+            if len(df) == 0 or pd.api.types.is_numeric_dtype(df[c]) or pd.api.types.is_datetime64_any_dtype(df[c]):
+                continue
+            if c in _DATE_COLS:
+                df[c] = pd.to_datetime(df[c], format="mixed").dt.date
+            elif c in _DATETIME_COLS:
+                df[c] = pd.to_datetime(df[c], format="mixed")
+    return df
 
 
 def load_companies(engine=None) -> pd.DataFrame:
@@ -214,15 +251,23 @@ PIPELINE_STATUSES = ["New", "Screened", "Under Review", "Due Diligence", "IC Rev
 
 
 def load_pipeline(engine=None) -> pd.DataFrame:
-    return read_df("""SELECT p.*, c.company_name, c.ticker, c.sector FROM deal_pipeline p
-                      JOIN companies c USING (company_id) ORDER BY p.updated_at DESC""", engine=engine)
+    p = read_df("SELECT * FROM deal_pipeline ORDER BY updated_at DESC", engine=engine or get_workspace_engine())
+    c = read_df("SELECT company_id, company_name, ticker, sector FROM companies")
+    return p.merge(c, on="company_id", how="inner")   # separate databases on SQLite, so join here
+
+
+def load_pipeline_history(limit: int = 100, engine=None) -> pd.DataFrame:
+    h = read_df("SELECT * FROM pipeline_history ORDER BY changed_at DESC LIMIT :n", {"n": limit},
+                engine=engine or get_workspace_engine())
+    c = read_df("SELECT company_id, company_name FROM companies")
+    return h.merge(c, on="company_id", how="left")[["changed_at", "company_name", "status", "note"]]
 
 
 def save_pipeline_entry(company_id: int, status: str, thesis: str = "", concerns: str = "",
                         next_steps: str = "", notes: str = "", engine=None) -> None:
     if status not in PIPELINE_STATUSES:
         raise ValueError(f"Unknown status {status!r}")
-    engine = engine or get_engine()
+    engine = engine or get_workspace_engine()
     now = dt.datetime.now()
     vals = dict(status=status, thesis=thesis, concerns=concerns, next_steps=next_steps, notes=notes, updated_at=now)
     with engine.begin() as conn:
@@ -237,7 +282,7 @@ def save_pipeline_entry(company_id: int, status: str, thesis: str = "", concerns
 
 
 def remove_pipeline_entry(company_id: int, engine=None) -> None:
-    engine = engine or get_engine()
+    engine = engine or get_workspace_engine()
     with engine.begin() as conn:
         conn.execute(m.deal_pipeline.delete().where(m.deal_pipeline.c.company_id == company_id))
         conn.execute(insert(m.pipeline_history).values(company_id=company_id, status="Removed",
@@ -246,9 +291,10 @@ def remove_pipeline_entry(company_id: int, engine=None) -> None:
 
 def save_ai_output(company_id: int, model: str, fact_pack: dict, output: str, unverified: list, engine=None) -> None:
     append_rows(m.ai_outputs, [dict(company_id=company_id, model=model, fact_pack=fact_pack, output=output,
-                                    unverified_numbers=unverified, created_at=dt.datetime.now())], engine)
+                                    unverified_numbers=unverified, created_at=dt.datetime.now())],
+                engine or get_workspace_engine())
 
 
 def load_ai_outputs(company_id: int, engine=None) -> pd.DataFrame:
     return read_df("SELECT * FROM ai_outputs WHERE company_id = :c ORDER BY created_at DESC",
-                   {"c": company_id}, engine=engine)
+                   {"c": company_id}, engine=engine or get_workspace_engine())

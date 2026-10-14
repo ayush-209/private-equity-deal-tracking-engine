@@ -8,9 +8,22 @@ explainable, research-ready deal pipeline:
 It is not a stock-picking or prediction tool. Every score, archetype and red flag can be traced back to
 source data → calculation → rule → interpretation, and the AI layer is restricted to a cited fact pack.
 
+## Where the data lives
+
+By default there is no database server. The data is one SQLite file, `data/pe.db`.
+
+- The `data-refresh` GitHub Action downloads the latest file, adds new data from Yahoo Finance, and publishes it to a
+  branch called `data` as a single commit (history is discarded, so the repository does not grow).
+- The Streamlit app downloads that file when it starts and again when its copy is more than six hours old. If GitHub is
+  unreachable it keeps using what it has.
+- Notes written inside the app (deal pipeline, AI outputs) go to a separate file, `data/workspace.db`, so a new data
+  file never overwrites them. On Streamlit Community Cloud that file is lost when the app restarts, so export anything you
+  want to keep.
+- To use PostgreSQL instead, set `PE_DATABASE_URL` (Docker Compose does this).
+
 ## Quick start
 
-### Docker (PostgreSQL included)
+### Docker (PostgreSQL included; optional)
 
 ```bash
 cp .env.example .env                                  # add ANTHROPIC_API_KEY if you want the AI page
@@ -26,8 +39,7 @@ Open http://localhost:8501.
 ```bash
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env                                  # set DATABASE_URL to your PostgreSQL
-python -m scripts.run_pipeline init
+python -m scripts.run_pipeline init                   # creates data/pe.db
 python -m scripts.run_pipeline all --source yfinance --limit 50   # first 50 Nifty 500 names
 streamlit run app.py
 ```
@@ -53,8 +65,7 @@ or drop the demo rows first.
 | `run_pipeline demo` | Synthetic data + screen | Testing |
 
 Add `--source yfinance|csv` and `--index nifty500|nifty_midsmallcap400|nifty_total_market`.
-`.github/workflows/refresh.yml` runs these on a schedule against the database in the `DATABASE_URL` repository
-secret. Every run is logged in the `pipeline_runs` table and `logs/pipeline.log`.
+`.github/workflows/refresh.yml` runs these on a schedule and publishes the updated `pe.db` to the `data` branch. Every run is logged in the `pipeline_runs` table and `logs/pipeline.log`.
 
 ## Data sources
 
@@ -77,7 +88,7 @@ secret. Every run is logged in the `pipeline_runs` table and `logs/pipeline.log`
 | | Risk & due diligence | Flags by category, valuation and data risks, traceable DD questions |
 | | AI research | Cited research note from a deterministic fact pack, with number verification |
 | | Investment committee | One-page summary and PDF export |
-| Workflow | Deal pipeline | Statuses, thesis, concerns, next steps; persists in PostgreSQL with history |
+| Workflow | Deal pipeline | Statuses, thesis, concerns, next steps; saved in `data/workspace.db` with history |
 | | Historical validation | Re-screen at a past date, track later fundamentals |
 | | Data quality | Grades, coverage, validation issues, run log |
 

@@ -15,7 +15,7 @@ services:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
+      PE_DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
     ports: ["8501:8501"]
     depends_on:
       db: {condition: service_healthy}
@@ -23,7 +23,7 @@ services:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
+      PE_DATABASE_URL: postgresql+psycopg2://pe:pe@db:5432/pe_deals
     entrypoint: ["python", "-m", "scripts.run_pipeline"]
     depends_on:
       db: {condition: service_healthy}
