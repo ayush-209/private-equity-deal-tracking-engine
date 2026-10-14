@@ -252,14 +252,14 @@ PIPELINE_STATUSES = ["New", "Screened", "Under Review", "Due Diligence", "IC Rev
 
 def load_pipeline(engine=None) -> pd.DataFrame:
     p = read_df("SELECT * FROM deal_pipeline ORDER BY updated_at DESC", engine=engine or get_workspace_engine())
-    c = read_df("SELECT company_id, company_name, ticker, sector FROM companies")
+    c = read_df("SELECT company_id, company_name, ticker, sector FROM companies", engine=engine)
     return p.merge(c, on="company_id", how="inner")   # separate databases on SQLite, so join here
 
 
 def load_pipeline_history(limit: int = 100, engine=None) -> pd.DataFrame:
     h = read_df("SELECT * FROM pipeline_history ORDER BY changed_at DESC LIMIT :n", {"n": limit},
                 engine=engine or get_workspace_engine())
-    c = read_df("SELECT company_id, company_name FROM companies")
+    c = read_df("SELECT company_id, company_name FROM companies", engine=engine)
     return h.merge(c, on="company_id", how="left")[["changed_at", "company_name", "status", "note"]]
 
 
