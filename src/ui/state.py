@@ -75,7 +75,13 @@ def weight_controls():
             st.rerun()
 
 
+def _embedded() -> bool:
+    return bool(st.session_state.get("_embed"))
+
+
 def provenance(uni: Universe):
+    if _embedded():
+        return
     if uni.is_synthetic:
         st.warning("Synthetic demo data. Every company here is fictitious and generated for testing. Load real data "
                    "with `python -m scripts.run_pipeline all --source yfinance`.", icon="⚠️")
@@ -84,15 +90,18 @@ def provenance(uni: Universe):
                else f"Data sources: {', '.join(uni.sources)}")
 
 
-def select_company(uni: Universe, label: str = "Company") -> int:
-    """Sidebar company picker shared across company pages. Passing companies are listed first."""
+def select_company(uni: Universe, label: str = "Company", container=None) -> int:
+    """Company picker shared across company pages (sidebar by default). Passing companies are listed first.
+    When a page is embedded in the Company page, the host's choice is used and no picker is drawn."""
     t = uni.table.sort_values(["passes_screen", "total_score"], ascending=[False, False])
     ids = t.company_id.tolist()
     names = dict(zip(t.company_id, t.company_name + " · " + t.ticker))
     current = st.session_state.get("company_id")
     if current not in ids:
         current = ids[0]
-    cid = st.sidebar.selectbox(label, ids, index=ids.index(current), format_func=lambda c: names[c],
+    if _embedded():
+        return current
+    cid = (container or st.sidebar).selectbox(label, ids, index=ids.index(current), format_func=lambda c: names[c],
                                key="company_select")
     st.session_state.company_id = cid
     return cid

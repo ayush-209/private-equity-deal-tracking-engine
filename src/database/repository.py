@@ -30,7 +30,7 @@ def get_engine(url: str | None = None) -> Engine:
     return create_engine(url, pool_pre_ping=True, future=True)
 
 
-WORKSPACE_TABLES = ["deal_pipeline", "pipeline_history", "ai_outputs"]
+WORKSPACE_TABLES = ["deal_pipeline", "pipeline_history", "ai_outputs", "saved_portfolios", "saved_holdings"]
 
 
 @lru_cache
@@ -298,3 +298,53 @@ def save_ai_output(company_id: int, model: str, fact_pack: dict, output: str, un
 def load_ai_outputs(company_id: int, engine=None) -> pd.DataFrame:
     return read_df("SELECT * FROM ai_outputs WHERE company_id = :c ORDER BY created_at DESC",
                    {"c": company_id}, engine=engine or get_workspace_engine())
+
+
+# ---------------------------------------------------------------- tracked portfolios
+HOLDING_COLS = ["ticker", "company_name", "shares", "buy_price", "buy_date", "segment", "sector"]
+
+
+def save_portfolio(name: str, capital: float, holdings: pd.DataFrame, note: str = "", engine=None) -> int:
+    """holdings needs ticker, shares, buy_price, buy_date; company_name, segment and sector are optional."""
+    engine = engine or get_workspace_engine()
+    if holdings.empty:
+        raise ValueError("A portfolio needs at least one holding")
+    rows = [{c: (None if pd.isna(r.get(c)) else r.get(c)) for c in HOLDING_COLS} for _, r in holdings.iterrows()]
+    for r in rows:
+        r["shares"], r["buy_price"] = float(r["shares"]), float(r["buy_price"])
+        r["buy_date"] = pd.to_datetime(r["buy_date"]).date()
+    with engine.begin() as conn:
+        pid = int(conn.execute(insert(m.saved_portfolios).values(name=name, capital=capital, note=note,
+                                                                  created_at=dt.datetime.now())).inserted_primary_key[0])
+        conn.execute(insert(m.saved_holdings), [{**r, "portfolio_id": pid} for r in rows])
+    return pid
+
+
+def load_portfolios(engine=None) -> pd.DataFrame:
+    return read_df("SELECT * FROM saved_portfolios ORDER BY created_at DESC", engine=engine or get_workspace_engine())
+
+
+def load_holdings(portfolio_id: int, engine=None) -> pd.DataFrame:
+    return read_df("SELECT * FROM saved_holdings WHERE portfolio_id = :p ORDER BY id", {"p": portfolio_id},
+                   engine=engine or get_workspace_engine())
+
+
+def replace_holdings(portfolio_id: int, holdings: pd.DataFrame, engine=None) -> None:
+    """Overwrite a portfolio's holdings, e.g. after the user corrects buy prices to match real trades."""
+    engine = engine or get_workspace_engine()
+    rows = [{c: (None if pd.isna(r.get(c)) else r.get(c)) for c in HOLDING_COLS} for _, r in holdings.iterrows()
+            if pd.notna(r.get("ticker")) and str(r.get("ticker")).strip()]
+    for r in rows:
+        r["shares"], r["buy_price"] = float(r["shares"]), float(r["buy_price"])
+        r["buy_date"] = pd.to_datetime(r["buy_date"]).date()
+    with engine.begin() as conn:
+        conn.execute(m.saved_holdings.delete().where(m.saved_holdings.c.portfolio_id == portfolio_id))
+        if rows:
+            conn.execute(insert(m.saved_holdings), [{**r, "portfolio_id": portfolio_id} for r in rows])
+
+
+def delete_portfolio(portfolio_id: int, engine=None) -> None:
+    engine = engine or get_workspace_engine()
+    with engine.begin() as conn:
+        conn.execute(m.saved_holdings.delete().where(m.saved_holdings.c.portfolio_id == portfolio_id))
+        conn.execute(m.saved_portfolios.delete().where(m.saved_portfolios.c.portfolio_id == portfolio_id))

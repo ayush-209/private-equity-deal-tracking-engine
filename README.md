@@ -76,21 +76,17 @@ Add `--source yfinance|csv` and `--index nifty500|nifty_midsmallcap400|nifty_tot
 
 ## Pages
 
-| Section | Page | Purpose |
-|---|---|---|
-| Screening | Executive dashboard | Funnel, sector mix, score distribution, growth vs ROIC |
-| | Deal universe | Filterable, sortable table; select a company; CSV/Excel/JSON export |
-| Portfolio | Class-basis scoring | Second ranking by cap segment: growth, profitability, valuation, risk, technicals; the reason for every weight; rank-stability and robustness checks |
-| | Portfolio builder | Top names per segment under position, sector and segment-minimum limits; whole-share allocation of the capital; portfolio beta and SD from the covariance matrix; historical path |
-| Company | Company deep dive | Trends, key metrics, score breakdown with every underlying metric, archetype reasons, red flags, PDF |
-| | Comparable companies | Automatic peer group, multiples vs p25/median/p75, what explains the valuation |
-| | Deal economics | Control (illustrative) or minority/PIPE; sources & uses, debt paydown, value bridge, MOIC/IRR heatmaps |
-| | Risk & due diligence | Flags by category, valuation and data risks, traceable DD questions |
-| | AI research | Cited research note from a deterministic fact pack, with number verification |
-| | Investment committee | One-page summary and PDF export |
-| Workflow | Deal pipeline | Statuses, thesis, concerns, next steps; saved in `data/workspace.db` with history |
-| | Historical validation | Re-screen at a past date, track later fundamentals |
-| | Data quality | Grades, coverage, validation issues, run log |
+| Page | Purpose |
+|---|---|
+| Start here | What the app does, live counts, the two scores explained |
+| Screen | Every company with its **deal score** (private equity) and **portfolio score** side by side; filters; extra PE filters and market overview |
+| Company | One place per company: overview, price chart (live, with fallback), peers, risks and diligence, deal economics, memo, AI note, and how it scores as a stock |
+| Deal shortlist (PE) | Same inputs as Portfolio (number of targets, size mix, sector limit) but ranked by deal score; funnel, decision log and a reason per target; add all to the deal pipeline |
+| Portfolio | Choose capital, number of stocks, size mix and style; see the filter funnel, every pick and near miss, and a plain reason per holding; save it |
+| Track | Saved portfolios valued at the latest prices (profit/loss, vs index, chart), CSV export/import, and the deal pipeline (stages, thesis, notes) with price moves |
+| More: Historical validation, Data quality | Back-testing the screen; grades, coverage and run log |
+
+Saved portfolios and watchlist notes live in `data/workspace.db`, which Streamlit Community Cloud clears when the app restarts. Download the CSV from Track to keep a copy and import it later.
 
 Screening weights are in the sidebar on every page; scores update immediately.
 

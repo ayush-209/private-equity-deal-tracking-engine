@@ -29,32 +29,101 @@ class Params:
     max_sector: float = 0.30
     weighting: str = "score"
     min_freq: float = 0.0          # optionally require selection frequency >= this (robust picks only)
+    exclude_ids: frozenset = frozenset()     # companies the user removed
+    include_ids: frozenset = frozenset()     # companies the user insists on (picked first, ignoring rank and sector limit)
 
 
-def select_names(scored: pd.DataFrame, p: Params, freq: pd.Series | None = None) -> tuple[pd.DataFrame, list[str]]:
-    """Top-k by class score within each segment. Sector concentration is limited at selection time to
-    floor(max_sector x total names) names per sector, so the weight cap is reachable afterwards."""
+FLOOR_SLACK = 0.05
+
+
+def derive_params(capital: float, n_stocks: int, mix: dict, max_position: float = 0.12, max_sector: float = 0.30,
+                  weighting: str = "score", **kw) -> Params:
+    """Everything follows from three choices: how many stocks, how to split capital across company sizes, and the
+    two risk limits. Names per segment = n_stocks x mix (largest-remainder rounding, at least one name for any segment
+    with a share). The minimum weight of a segment is its mix share minus 5 points, so sizing can lean a little toward
+    better ideas without abandoning the mix the user chose."""
+    mix = {s: max(float(v), 0.0) for s, v in mix.items()}
+    tot = sum(mix.values())
+    if tot <= 0 or n_stocks < 1:
+        raise ValueError("Need at least one stock and a positive mix")
+    mix = {s: v / tot for s, v in mix.items()}
+    raw = {s: n_stocks * v for s, v in mix.items()}
+    names = {s: int(raw[s]) for s in raw}
+    for s in sorted(raw, key=lambda k: raw[k] - names[k], reverse=True):
+        if sum(names.values()) >= n_stocks:
+            break
+        names[s] += 1
+    for s, v in mix.items():
+        if v > 0 and names[s] == 0:
+            names[s] = 1
+    floors = {s: max(0.0, v - FLOOR_SLACK) for s, v in mix.items()}
+    return Params(capital=float(capital), names_per_segment={s: n for s, n in names.items() if n > 0},
+                  min_segment_weight=floors, max_position=max_position, max_sector=max_sector, weighting=weighting, **kw)
+
+
+def select_with_reasons(scored: pd.DataFrame, p: Params, freq: pd.Series | None = None,
+                        extra_rows: int = 3) -> tuple[pd.DataFrame, list[str], pd.DataFrame]:
+    """Top-k by class score within each segment, with a decision recorded for every candidate looked at.
+    Order of rules: (1) names the user excluded are never considered; (2) names the user included are picked first;
+    (3) the rest are taken best-first, skipping a name when its sector would exceed floor(max sector x number of names)
+    names, or when it is not picked often enough across random weightings (if that filter is on).
+    Returns (selected rows, notes, decisions) where decisions has one row per candidate shown."""
     notes: list[str] = []
     total = sum(p.names_per_segment.values())
     max_per_sector = max(1, int(math.floor(p.max_sector * total)))
-    chosen, sector_count = [], {}
-    pool = scored[scored.eligible & scored.class_score.notna()].copy()
-    if freq is not None and p.min_freq > 0:
-        pool = pool[pool.company_id.map(freq).fillna(0) >= p.min_freq]
+    chosen, decisions, sector_count = [], [], {}
+    base = scored[scored.eligible & scored.class_score.notna()]
     for seg, k in p.names_per_segment.items():
-        cand = pool[pool.cap_segment == seg].sort_values("class_score", ascending=False)
-        got = 0
-        for _, r in cand.iterrows():
+        seg_all = base[base.cap_segment == seg].sort_values("class_score", ascending=False)
+        n_seg = len(seg_all)
+        forced = seg_all[seg_all.company_id.isin(p.include_ids)]
+        got, shown_after = 0, 0
+        for _, r in forced.iterrows():
+            chosen.append(r)
+            sector_count[r.sector] = sector_count.get(r.sector, 0) + 1
+            got += 1
+            decisions.append(_decision(r, seg, "Picked", "Added by you", n_seg))
+        for _, r in seg_all.iterrows():
+            if r.company_id in p.include_ids:
+                continue
+            if r.company_id in p.exclude_ids:
+                if got < k or shown_after < extra_rows:
+                    decisions.append(_decision(r, seg, "Skipped", "Removed by you", n_seg))
+                continue
             if got >= k:
-                break
+                if shown_after < extra_rows:
+                    decisions.append(_decision(r, seg, "Not picked", f"Ranks below the {k} places for {seg}-cap", n_seg))
+                    shown_after += 1
+                continue
             if sector_count.get(r.sector, 0) >= max_per_sector:
+                decisions.append(_decision(r, seg, "Skipped",
+                                           f"Sector limit: {r.sector} already has {sector_count[r.sector]} "
+                                           f"(max {max_per_sector} for a {total}-stock portfolio)", n_seg))
+                continue
+            if freq is not None and p.min_freq > 0 and (freq.get(r.company_id, 0) or 0) < p.min_freq:
+                decisions.append(_decision(r, seg, "Skipped",
+                                           f"Picked in only {freq.get(r.company_id, 0):.0%} of random weightings "
+                                           f"(you asked for {p.min_freq:.0%})", n_seg))
                 continue
             chosen.append(r)
             sector_count[r.sector] = sector_count.get(r.sector, 0) + 1
             got += 1
+            decisions.append(_decision(r, seg, "Picked", "Best remaining score in its size group", n_seg))
         if got < k:
-            notes.append(f"Only {got} of {k} requested {seg}-cap names were available after eligibility and sector limits.")
-    return (pd.DataFrame(chosen).reset_index(drop=True) if chosen else pd.DataFrame()), notes
+            notes.append(f"Only {got} of {k} requested {seg}-cap names were available after eligibility and limits.")
+    sel = pd.DataFrame(chosen).reset_index(drop=True) if chosen else pd.DataFrame()
+    return sel, notes, pd.DataFrame(decisions)
+
+
+def _decision(r, seg, status, reason, n_seg) -> dict:
+    return {"company_id": r.company_id, "company_name": r.company_name, "ticker": r.ticker, "cap_segment": seg,
+            "sector": r.sector, "rank": int(r.rank_in_segment) if pd.notna(r.get("rank_in_segment")) else None,
+            "of": n_seg, "score": r.class_score, "decision": status, "reason": reason}
+
+
+def select_names(scored: pd.DataFrame, p: Params, freq: pd.Series | None = None) -> tuple[pd.DataFrame, list[str]]:
+    sel, notes, _ = select_with_reasons(scored, p, freq)
+    return sel, notes
 
 
 def target_weights(sel: pd.DataFrame, weighting: str) -> np.ndarray:
@@ -163,9 +232,10 @@ def portfolio_risk(weights: pd.Series, rets: pd.DataFrame, bench_ret: pd.Series 
 
 def build_portfolio(scored: pd.DataFrame, prices: pd.DataFrame, bench_ret: pd.Series, p: Params,
                     freq: pd.Series | None = None) -> dict:
-    sel, notes = select_names(scored, p, freq)
+    sel, notes, decisions = select_with_reasons(scored, p, freq)
     if sel.empty:
-        return {"holdings": pd.DataFrame(), "notes": notes + ["No eligible names."], "risk": {}, "cash": p.capital}
+        return {"holdings": pd.DataFrame(), "notes": notes + ["No eligible names."], "risk": {}, "cash": p.capital,
+                "decisions": decisions}
     w, n2 = size_positions(sel, p)
     notes += n2
     shares, cash = round_to_shares(w, sel.last_price.to_numpy(float), p.capital)
@@ -188,4 +258,5 @@ def build_portfolio(scored: pd.DataFrame, prices: pd.DataFrame, bench_ret: pd.Se
         if s in seg_w.index and seg_w[s] < fl - 0.005:
             notes.append(f"After whole-share rounding the {s}-cap weight is {seg_w[s]:.1%}, a little under the {fl:.0%} floor.")
     return {"holdings": h, "notes": notes, "risk": risk, "cash": cash, "invested": float(h.invested.sum()),
+            "decisions": decisions,
             "segment_weights": seg_w, "sector_weights": h.groupby("sector").weight.sum().sort_values(ascending=False)}

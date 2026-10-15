@@ -317,3 +317,12 @@ Initial capital is an input (default Rs 1 crore). The app does not model or assu
 - Banks, NBFCs and insurers are excluded by default; ROCE and sales growth are not comparable for lenders.
 - The Yahoo label for current liabilities is "Current Liabilities"; where a company lacks it, ROCE is approximate and labelled.
 
+
+
+### How the portfolio is derived (no fixed list)
+
+Four user choices drive everything: capital, number of stocks, the split of money across size groups (large, mid, small), and a style (one of the documented weight sets). Names per size group are `number of stocks x split`, rounded by largest remainder with at least one name for any group with a share. A group's minimum weight is its share minus 5 points, so sizing can lean toward better ideas without abandoning the chosen split. Position and sector limits are inputs with defaults (12% and 30%); the sector limit becomes a maximum number of names per sector, `floor(limit x stocks)`. The Portfolio page lists the eligibility funnel and a decision for every candidate (picked, skipped with the reason, or first below the cut), so each result can be traced.
+
+### Price tracking
+
+A saved portfolio stores shares, buy price and buy date per holding. Current value uses the latest daily close from Yahoo Finance (cached 15 minutes); if that is unavailable the page falls back to the monthly closes in the database and says so. Profit/loss compares value with cost for holdings that have a price; the value path counts each holding from its buy date. The index comparison rebases the index to the amount invested at the start. Buy prices default to the latest stored price at save time and can be corrected to real trades. Prices are not dividend-adjusted, so total return is understated.

@@ -43,6 +43,15 @@ CREATE TABLE pipeline_runs (
 	PRIMARY KEY (run_id)
 );
 
+CREATE TABLE saved_portfolios (
+	portfolio_id SERIAL NOT NULL, 
+	name VARCHAR(120) NOT NULL, 
+	capital FLOAT, 
+	note TEXT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	PRIMARY KEY (portfolio_id)
+);
+
 CREATE TABLE ai_outputs (
 	id SERIAL NOT NULL, 
 	company_id INTEGER NOT NULL, 
@@ -197,6 +206,22 @@ CREATE TABLE pipeline_history (
 	PRIMARY KEY (id), 
 	FOREIGN KEY(company_id) REFERENCES companies (company_id)
 );
+
+CREATE TABLE saved_holdings (
+	id SERIAL NOT NULL, 
+	portfolio_id INTEGER NOT NULL, 
+	ticker VARCHAR(32) NOT NULL, 
+	company_name VARCHAR(255), 
+	shares FLOAT NOT NULL, 
+	buy_price FLOAT NOT NULL, 
+	buy_date DATE NOT NULL, 
+	segment VARCHAR(16), 
+	sector VARCHAR(64), 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(portfolio_id) REFERENCES saved_portfolios (portfolio_id)
+);
+
+CREATE INDEX ix_saved_holdings_portfolio_id ON saved_holdings (portfolio_id);
 
 CREATE TABLE screening_results (
 	id SERIAL NOT NULL, 

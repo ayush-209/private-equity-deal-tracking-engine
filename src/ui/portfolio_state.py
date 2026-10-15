@@ -51,3 +51,10 @@ def class_weights() -> dict:
 
 def scored(d: ClassData, include_financials: bool, exclude_loss: bool) -> pd.DataFrame:
     return class_scores(d, normalise(class_weights(), dim_names()), include_financials, exclude_loss)
+
+
+def set_style(key: str) -> dict:
+    """Load one of the documented weight sets (e.g. 'base', 'defensive') into the session."""
+    w = {d: float(v) for d, v in portfolio_config()["weight_sets"][key].items()}
+    st.session_state.class_weights = w
+    return w

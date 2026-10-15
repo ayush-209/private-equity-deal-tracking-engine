@@ -160,6 +160,28 @@ ai_outputs = Table(
     Column("unverified_numbers", JSON),
 )
 
+saved_portfolios = Table(     # portfolios the user chose to track (workspace data, not refreshed market data)
+    "saved_portfolios", metadata,
+    Column("portfolio_id", Integer, primary_key=True, autoincrement=True),
+    Column("name", String(120), nullable=False),
+    Column("capital", Float),
+    Column("note", Text),
+    Column("created_at", DateTime, server_default=func.now()),
+)
+
+saved_holdings = Table(
+    "saved_holdings", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("portfolio_id", Integer, ForeignKey("saved_portfolios.portfolio_id"), nullable=False, index=True),
+    Column("ticker", String(32), nullable=False),
+    Column("company_name", String(255)),
+    Column("shares", Float, nullable=False),
+    Column("buy_price", Float, nullable=False),
+    Column("buy_date", Date, nullable=False),
+    Column("segment", String(16)),
+    Column("sector", String(64)),
+)
+
 pipeline_runs = Table(
     "pipeline_runs", metadata,
     Column("run_id", Integer, primary_key=True, autoincrement=True),
