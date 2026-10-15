@@ -41,7 +41,7 @@ else:
     if min_deal: m &= x.total_score.fillna(-1) >= min_deal
     if min_port: m &= x.class_score.fillna(-1) >= min_port
     if both: m &= x.passes_screen.fillna(False).astype(bool) & x.class_score.notna()
-    v = x[m].sort_values(["class_score", "total_score"], ascending=False)
+    v = x[m].sort_values(["total_score", "class_score"], ascending=False)
     st.caption(f"{len(v):,} of {len(x):,} companies. Click a column header to sort. Select a row to open it in Company.")
     show = v[["company_name", "ticker", "sector", "cap_segment", "market_cap", "total_score", "passes_screen", "archetype",
               "class_score", "rank_in_segment", "roe", "pe", "n_flags"]].rename(columns={
@@ -61,8 +61,8 @@ else:
     if rows:
         cid = int(v.iloc[rows[0]].company_id)
         st.session_state.company_id = cid
-        st.success(f"Selected: {v.iloc[rows[0]].company_name}. Open **Company** in the left menu to see everything about it.")
-        if b1.button("Add to deal pipeline (Track)"):
+        st.success(f"Selected: {v.iloc[rows[0]].company_name}. Open **Company & underwriting** in the left menu to see everything about it.")
+        if b1.button("Add to deal pipeline "):
             repo.save_pipeline_entry(cid, "New", "", "", "", "")
             st.toast("Added to the pipeline")
     b2.download_button("Download this table (CSV)", to_csv_bytes(show), "screen.csv")

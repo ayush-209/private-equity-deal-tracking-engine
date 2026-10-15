@@ -30,17 +30,33 @@ st.markdown("""
 
 P = "app_pages"
 nav = st.navigation({
-    "": [
+    "Start": [
         st.Page(f"{P}/start.py", title="Start here", icon="🏠", default=True),
-        st.Page(f"{P}/screen.py", title="Screen", icon="🔎"),
-        st.Page(f"{P}/company.py", title="Company", icon="🏢"),
-        st.Page(f"{P}/deals.py", title="Deal shortlist (PE)", icon="🤝"),
-        st.Page(f"{P}/portfolio.py", title="Portfolio", icon="🧺"),
-        st.Page(f"{P}/track.py", title="Track", icon="📈"),
     ],
-    "More": [
+    "Screening": [
+        st.Page(f"{P}/executive_dashboard.py", title="Executive dashboard", icon="📈"),
+        st.Page(f"{P}/deal_universe.py", title="Deal universe", icon="🔎"),
+        st.Page(f"{P}/screen.py", title="Deal + portfolio scores", icon="⚖️"),
+        st.Page(f"{P}/deals.py", title="Deal shortlist", icon="🤝"),
+    ],
+    "Company": [
+        st.Page(f"{P}/company.py", title="Company hub (all-in-one)", icon="🏢"),
+        st.Page(f"{P}/company_deep_dive.py", title="Company deep dive", icon="📊"),
+        st.Page(f"{P}/comparables.py", title="Comparable companies", icon="🧮"),
+        st.Page(f"{P}/deal_economics.py", title="Deal economics", icon="💰"),
+        st.Page(f"{P}/risk_due_diligence.py", title="Risk & due diligence", icon="🚩"),
+        st.Page(f"{P}/ai_research.py", title="AI research", icon="🧠"),
+        st.Page(f"{P}/investment_committee.py", title="Investment committee", icon="📄"),
+    ],
+    "Portfolio": [
+        st.Page(f"{P}/portfolio.py", title="Portfolio builder", icon="🧺"),
+        st.Page(f"{P}/track.py", title="Track portfolio", icon="📉"),
+    ],
+    "Workflow": [
+        st.Page(f"{P}/deal_pipeline.py", title="Deal pipeline", icon="🗂️"),
         st.Page(f"{P}/historical_validation.py", title="Historical validation", icon="⏪"),
         st.Page(f"{P}/data_quality.py", title="Data quality", icon="🧪"),
     ],
 })
+state.weight_controls()
 nav.run()

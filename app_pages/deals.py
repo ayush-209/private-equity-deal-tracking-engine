@@ -110,12 +110,12 @@ rows = ev.selection.rows if ev and ev.selection else []
 if rows:
     r = sel.iloc[rows[0]]
     st.session_state.company_id = int(r.company_id)
-    st.success(f"Selected {r.company_name}. Open **Company** → *Deal economics* or *Memo* to underwrite it.")
+    st.success(f"Selected {r.company_name}. Open **Company & underwriting** → *Deal economics* or *Memo* to underwrite it.")
 a, b = st.columns(2)
 if a.button("Add all to the deal pipeline", type="primary"):
     have = set(repo.load_pipeline().company_id)
     new = [int(c) for c in sel.company_id if int(c) not in have]
     for c in new:
         repo.save_pipeline_entry(c, "New", "", "", "", "")
-    st.success(f"Added {len(new)} compan{'y' if len(new) == 1 else 'ies'} (the rest were already there). See Track → Deal pipeline.")
+    st.success(f"Added {len(new)} compan{'y' if len(new) == 1 else 'ies'} (the rest were already there). See the Deal pipeline page.")
 b.download_button("Download shortlist (CSV)", to_csv_bytes(out), "deal_shortlist.csv")

@@ -28,7 +28,7 @@ def demo_env(tmp_path_factory):
         os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
 
 
-PAGES = ["start", "screen", "company", "deals", "portfolio", "track", "historical_validation", "data_quality"]
+PAGES = ["executive_dashboard", "deal_universe", "company_deep_dive", "comparables", "deal_economics", "risk_due_diligence", "ai_research", "investment_committee", "deal_pipeline", "start", "screen", "company", "deals", "portfolio", "track", "historical_validation", "data_quality"]
 
 
 @pytest.mark.parametrize("page", PAGES)

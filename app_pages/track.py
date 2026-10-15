@@ -11,57 +11,8 @@ from src.ui.formatting import indian_group
 from src.ui.live import daily_prices
 
 uni = state.universe()
-st.title("Track")
-st.caption("Your saved portfolios and the companies in your deal pipeline, valued at the latest prices.")
-
-view = st.radio("View", ["My portfolio", "Deal pipeline"], horizontal=True, label_visibility="collapsed")
-
-if view == "Deal pipeline":
-    pipe = repo.load_pipeline()
-    if pipe.empty:
-        st.info("The deal pipeline is empty. Build a shortlist on **Deal shortlist (PE)**, or select a company on **Screen** and add it.")
-        st.stop()
-    t = uni.table[["company_id", "total_score", "passes_screen", "n_flags"]]
-    pipe = pipe.merge(t, on="company_id", how="left")
-    panel = repo.load_price_panel()
-    ids = dict(zip(pipe.company_id, pipe.ticker))
-    live = daily_prices(tuple(ids.values()), (pd.Timestamp.today() - pd.DateOffset(years=1, days=10)).date().isoformat())
-    rows = []
-    for cid, tick in ids.items():
-        if tick in live.columns and live[tick].notna().sum() > 5:
-            s = live[tick].dropna()
-        else:
-            s = panel[panel.company_id == cid].assign(date=lambda x: pd.to_datetime(x.date)).set_index("date").share_price
-        stt = tk.stock_stats(s)
-        rows.append({"company_id": cid, "Price": stt["last"], "1M": stt.get("ret_1M"), "3M": stt.get("ret_3M"),
-                     "6M": stt.get("ret_6M"), "1Y": stt.get("ret_1Y")})
-    out = pipe.merge(pd.DataFrame(rows), on="company_id")[["company_name", "ticker", "status", "total_score", "Price", "1M", "3M",
-                                                              "6M", "1Y", "thesis", "next_steps"]]
-    for c in ["1M", "3M", "6M", "1Y"]:
-        out[c] = out[c] * 100
-    st.dataframe(out.rename(columns={"company_name": "Company", "ticker": "Ticker", "status": "Stage", "total_score": "Deal score",
-                                     "thesis": "Thesis", "next_steps": "Next steps"}), hide_index=True, width="stretch",
-                 column_config={"Price": st.column_config.NumberColumn(format="%.2f"),
-                                "Deal score": st.column_config.NumberColumn(format="%.0f"),
-                                **{c: st.column_config.NumberColumn(format="%+.1f%%") for c in ["1M", "3M", "6M", "1Y"]}})
-    with st.expander("Update stage, thesis and notes"):
-        names = dict(zip(pipe.company_id, pipe.company_name))
-        cid = st.selectbox("Company", pipe.company_id.tolist(), format_func=names.get)
-        cur = pipe[pipe.company_id == cid].iloc[0]
-        with st.form("pipe_edit"):
-            status = st.selectbox("Stage", repo.PIPELINE_STATUSES, index=repo.PIPELINE_STATUSES.index(cur.status))
-            thesis = st.text_area("Thesis", cur.thesis or "")
-            concerns = st.text_area("Concerns", cur.concerns or "")
-            nxt = st.text_area("Next steps", cur.next_steps or "")
-            notes = st.text_area("Notes", cur.notes or "")
-            a, b = st.columns(2)
-            if a.form_submit_button("Save", type="primary"):
-                repo.save_pipeline_entry(int(cid), status, thesis, concerns, nxt, notes)
-                st.rerun()
-            if b.form_submit_button("Remove from pipeline"):
-                repo.remove_pipeline_entry(int(cid))
-                st.rerun()
-    st.stop()
+st.title("Track my portfolio")
+st.caption("Saved portfolios valued at the latest prices.")
 
 # ------------------------------------------------------------------ portfolios
 pf = repo.load_portfolios()
