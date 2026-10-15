@@ -77,3 +77,17 @@ def test_deal_shortlist_adds_to_pipeline(demo_env):
     assert not at.exception, [e.value for e in at.exception]
     from src.database import repository as repo
     assert len(repo.load_pipeline()) >= 3
+
+
+ALL_PAGES = ["start.py", "executive_dashboard.py", "deal_universe.py", "screen.py", "deals.py", "company.py", "company_deep_dive.py",
+             "comparables.py", "deal_economics.py", "risk_due_diligence.py", "ai_research.py", "investment_committee.py",
+             "portfolio.py", "track.py", "deal_pipeline.py", "historical_validation.py", "data_quality.py"]
+
+
+@pytest.mark.parametrize("page", ALL_PAGES)
+def test_every_page_through_the_real_menu(demo_env, page):
+    """Pages run under app.py, which draws shared sidebar widgets; a page that repeats one would crash here only."""
+    at = streamlit_testing.AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+    at.run()
+    at.switch_page(f"app_pages/{page}").run()
+    assert not at.exception, [e.value for e in at.exception]

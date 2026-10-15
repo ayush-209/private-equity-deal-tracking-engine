@@ -21,7 +21,6 @@ x["class_score"] = x["class_score"].astype(float)
 
 tab = st.radio("View", ["Companies", "More PE filters", "Market overview"], horizontal=True, label_visibility="collapsed")
 if tab == "More PE filters":
-    state.weight_controls()
     embed.run_page("deal_universe")
 elif tab == "Market overview":
     embed.run_page("executive_dashboard")

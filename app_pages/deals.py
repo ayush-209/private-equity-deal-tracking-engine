@@ -30,7 +30,6 @@ no_crit = o3.toggle("Skip companies with critical red flags", value=True)
 high_q = o4.toggle("Skip low data quality", value=True)
 st.caption("Deal-score weights (growth, profitability, cash flow, leverage, valuation, working capital) are in the left "
            "sidebar under *Screening weights*. The size groups are the same ones the Portfolio page uses.")
-state.weight_controls()
 
 t = uni.table
 seg = ps.scored(d, True, False)[["company_id", "cap_segment", "ineligible_reason"]]
